@@ -1,0 +1,46 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.config/claude/statusline.sh"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/hooks/auto-subagent-reminder.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-extended-cc-marketplace": {
+      "source": { "source": "github", "repo": "pcvelz/superpowers" }
+    },
+    "Mixedbread-Grep": {
+      "source": { "source": "github", "repo": "mixedbread-ai/mgrep" }
+    },
+    "ecc": {
+      "source": { "source": "git", "url": "https://github.com/affaan-m/ECC.git" }
+    },
+    "impeccable": {
+      "source": { "source": "github", "repo": "pbakaus/impeccable" }
+    }
+  },
+  "enabledPlugins": {
+    "superpowers-extended-cc@superpowers-extended-cc-marketplace": true,
+    "mgrep@Mixedbread-Grep": true,
+    "ecc@ecc": true,
+    "impeccable@impeccable": true
+  },
+  "pluginConfigs": {
+    "ecc@ecc": { "options": { "hooks_enabled": true, "hook_profile": "standard" } }
+  },
+  "attribution": { "commit": "", "pr": "" },
+  "tui": "fullscreen",
+  "agentPushNotifEnabled": true
+}
