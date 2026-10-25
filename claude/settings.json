@@ -32,6 +32,17 @@
   "tui": "fullscreen",
   "agentPushNotifEnabled": true,
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/harness/claude/hooks/advisor-reset.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Agent",

@@ -35,8 +35,8 @@
 # --resume sends the message plus the report request with a fresh report path
 # (an old path would return the previous report at once) and keeps the pane.
 #
-# Claude workers start with Superpowers off: a leaf that brainstorms waits for
-# an approval no one gives, and its session text would fill every worker.
+# Claude workers start with Superpowers and the paid advisor off. HARNESS_LEAF
+# also keeps their SessionStart hook from resetting the user's advisor choice.
 # Codex ignores config switches for a remote plugin, so its workers keep the
 # skill list (no session hook there); the leaf contract in AGENTS.md governs.
 set -uo pipefail
@@ -47,7 +47,7 @@ start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting=''
 
 CLAUDE_STANDARD="haiku sonnet opus"
 ROLES='impl|review|explore|fix'
-CLAUDE_PLUGINS_OFF='{"enabledPlugins":{"superpowers@anthropic-plugin-directory":false}}'
+CLAUDE_WORKER_SETTINGS='{"enabledPlugins":{"superpowers@anthropic-plugin-directory":false},"env":{"CLAUDE_CODE_DISABLE_ADVISOR_TOOL":"1","HARNESS_LEAF":"1"}}'
 
 usage() { echo "usage: $0 claude|codex <alias> <effort> <role> <task> <brief> | --wait <pane> <report> [minutes] | --resume <pane> <message-file> [minutes]" >&2; exit 2; }
 # A report path no other round can share: an old path returns its old report.
@@ -119,7 +119,7 @@ if [ "$kind" = claude ]; then
   model=$alias
   args=(--model "$alias" --effort "$effort" --append-system-prompt
         'You are a leaf worker. Do not delegate, spawn subagents, or start other agents. Do the work yourself.'
-        --settings "$CLAUDE_PLUGINS_OFF")
+        --settings "$CLAUDE_WORKER_SETTINGS")
 elif [ "$kind" = codex ]; then
   rc=0; resolved=$("$here/codex-model.sh" "$alias" "$effort") || rc=$?
   case "$rc" in

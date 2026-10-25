@@ -256,8 +256,10 @@ then echo "ok   pane split: opens in the caller's directory"; else echo "FAIL pa
 # an approval no one gives. Codex has no such switch for a remote plugin, so
 # no dead override is passed.
 if grep -A1 -x -- --settings "$tmp/state-claude/start" | tail -1 \
-     | grep -qxF -- '{"enabledPlugins":{"superpowers@anthropic-plugin-directory":false}}'
-then echo "ok   pane claude: Superpowers off in the worker"; else echo "FAIL pane claude: no plugin override"; fail=1; fi
+     | jq -e '.enabledPlugins["superpowers@anthropic-plugin-directory"] == false
+              and .env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL == "1"
+              and .env.HARNESS_LEAF == "1"' >/dev/null 2>&1
+then echo "ok   claude worker launch: advisor disabled and leaf marked"; else echo "FAIL claude worker launch: missing worker settings"; fail=1; fi
 if ! grep -q superpowers "$tmp/state-happy/start"
 then echo "ok   pane codex: no dead plugin override"; else echo "FAIL pane codex: passes an override Codex ignores"; fail=1; fi
 missing=

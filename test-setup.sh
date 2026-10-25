@@ -51,7 +51,8 @@ if [ "$(readlink "$CLAUDE_CONFIG_DIR/CLAUDE.md")" = "$repo/claude/CLAUDE.global.
 else no 'upgrade: CLAUDE.md, skills/delegate and AGENTS.md link into the new clone'; fi
 
 if jq -e 'has("advisorModel") == false and .keepMe == 1
-  and ([.hooks.SessionStart[].hooks[].command] == ["bash '\''/x/herdr-agent-state.sh'\'' session"])' \
+  and ([.hooks.SessionStart[].hooks[].command] == ["bash '\''/x/herdr-agent-state.sh'\'' session",
+    "sh ~/.claude/harness/claude/hooks/advisor-reset.sh"])' \
   "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
   ok 'upgrade: advisorModel removed, keepMe kept, herdr hook kept'
 else no 'upgrade: advisorModel removed, keepMe kept, herdr hook kept'; fi
