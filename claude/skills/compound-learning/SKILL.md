@@ -31,13 +31,16 @@ Follow these steps in order:
    that was ignored, ideally into a check, rather than copying it. For a
    recurring lesson, append today's date to `Recurrences: YYYY-MM-DD, ...`
    as the last line of its body; create that line if absent.
-4. **Destination.** Choose the first of test/check, project doc, skill,
-   global instruction, memory that would have prevented the mistake.
+4. **Destination.** Choose exactly one destination per mistake: the first of
+   test/check, project doc, skill, global instruction, memory that would
+   have prevented it.
    Drop task-local facts.
 5. **Privacy.** Before writing or proposing anything outside the brain,
    remove personal details, host names, work information, secrets and quotes.
    This applies whatever the source: brain, work-local memory or review output.
-6. **Act by gate.** Use the destination's action:
+6. **Act by gate.** Act only at the chosen destination; print exactly one
+   `Learned:` line per mistake. Memory applies only when no higher destination
+   does; the rejected-proposal memory below is the sole exception.
 
    | Destination | Action |
    |---|---|
