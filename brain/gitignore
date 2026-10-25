@@ -1,0 +1,10 @@
+/*
+!/.gitignore
+!/*/
+/-tmp*/
+/*/*
+!/*/memory/
+/*/memory/**
+!/*/memory/**/
+!/*/memory/**/*.md
+/*/memory/**/.*
