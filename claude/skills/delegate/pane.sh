@@ -183,9 +183,7 @@ if [ -n "$kind" ]; then
     '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-")))] | last | .pane_id // empty')
   if [ -n "$column" ]; then split=(--pane "$column" --direction down)
   else split=(--pane "$HERDR_PANE_ID" --direction right); fi
-  # The worker starts where the caller runs (a worktree, for SDD), not in the
-  # orchestrator pane's directory: Codex's sandbox and Claude's project are
-  # rooted there, and anything outside asks for approval on every edit.
+  # The worker starts in the caller's directory (a worktree, for SDD).
   pane=$(herdr pane split "${split[@]}" --cwd "$PWD" --ratio 0.5 --no-focus \
     | jq -r '.result.pane_id // .result.pane.pane_id // empty')
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
@@ -208,8 +206,7 @@ resent=0 quiet_since=
 while :; do
   now=$(date +%s); el=$(( now - start ))
   [ "$el" -lt "$limit" ] || finish TIMEOUT 124
-  # Codex can open a hook-review screen that swallows the first prompt while
-  # Herdr reports working, possibly after the first poll: escape, resend once.
+  # On a Codex hook-review screen during landing, send Escape and resend once.
   if [ -z "$waiting" ] && [ "$el" -lt "$land" ] && screen | grep -qE 'Hooks +— +[0-9]+ hooks? needs? review'; then
     [ "$resent" = 0 ] || finish NOSTART 7
     herdr agent send-keys "$pane" esc >/dev/null; sleep 1
@@ -226,7 +223,7 @@ while :; do
   fi
   case "$st" in
     working) landed=1 quiet_since= ;;
-    blocked) # after --wait, the question just answered can linger for a moment
+    blocked) # --wait allows a grace period before reporting BLOCKED
              [ -n "$waiting" ] && [ "$el" -lt "$quiet" ] || finish BLOCKED 3 ;;
     gone|'') finish GONE 6 ;;
     *)  # idle/done/unknown: a report can trail the last turn, so allow a grace

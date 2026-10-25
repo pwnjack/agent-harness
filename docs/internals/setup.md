@@ -22,16 +22,14 @@ instead of deleting it, deletes links into this repo whose target is gone,
 lets Herdr install its own agent-state hooks, and sets the clone's
 `core.hooksPath` to `githooks`.
 
-- The global files are not named `CLAUDE.md`/`AGENTS.md`, so neither loads as
-  a nested project file.
-- Neither live settings file can be a symlink, because the tools write to
-  them: edit the tracked file, then run the apply script.
+- The global files are named `CLAUDE.global.md` and `AGENTS.global.md`.
+- Live settings are regular files. Edit the tracked file, then run the apply
+  script.
 - `<config>` is `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`, resolved once by setup
   and passed to later processes as an argument. Codex follows
   `${CODEX_HOME:-$HOME/.codex}`; state and units follow `XDG_STATE_HOME` and
   `XDG_CONFIG_HOME`.
-- The harness link is always `$HOME/.claude/harness`, because tracked
-  commands name that path literally.
+- The harness link is always `$HOME/.claude/harness`.
 - Setup never exports `CLAUDE_CONFIG_DIR`; `test-setup.sh` checks this.
 - `claude/apply-settings.sh` merges objects key by key and replaces a live
   hook that runs the same script file. It drops a live hook whose
@@ -47,14 +45,13 @@ of Codex's `config.toml`; `codex/features.toml` sets `memories = false`.
 
 Never track logins, history, memory, caches, plugin checkouts, or anything a
 tool writes into its own config (Herdr's hooks, project trust, auto-mode
-text): the repo is public and a fresh machine stays fresh.
+text).
 
 ## Context budget
 
-Everything in `CLAUDE.global.md`, `AGENTS.global.md`, a project `CLAUDE.md`,
-the memory index, and each enabled plugin's skill listing and session hooks is
-paid for in every session and every worker. Add a line there only if every
-task needs it; otherwise it belongs in a skill or in `docs/internals/`.
+Add text to `CLAUDE.global.md`, `AGENTS.global.md`, a project `CLAUDE.md`,
+the memory index, or an enabled plugin's skill listing and session hooks only
+if every task needs it; otherwise put it in a skill or in `docs/internals/`.
 Tracked files are a manual for the agent: they describe what exists and how
 to use it. Decisions, lessons, traps and history go to memory.
 

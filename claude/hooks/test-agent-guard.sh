@@ -29,9 +29,7 @@ if [ "$rc" = 0 ] \
    && [ "$(jq -r .hookSpecificOutput.permissionDecisionReason <<<"$out" 2>/dev/null)" = "$reason" ]
 then ok "inside Herdr: Agent denied with the pane reason"; else no "inside Herdr: rc $rc, out '$out'"; fi
 
-# Input comes from a here-string, not `echo |`: the hook exits without reading
-# it outside Herdr, and a writer still running then dies of SIGPIPE, which
-# pipefail turns into a 141 on a loaded machine.
+# Pass empty JSON through a here-string; outside Herdr, expect silent success.
 for v in unset '' 0; do
   if [ "$v" = unset ]; then out=$(env -u HERDR_ENV sh "$here/agent-guard.sh" <<<'{}' 2>&1); rc=$?
   else out=$(env HERDR_ENV="$v" sh "$here/agent-guard.sh" <<<'{}' 2>&1); rc=$?; fi

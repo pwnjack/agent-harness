@@ -7,10 +7,8 @@ description: Hand implementation, review or exploration to another model (Claude
 
 ## Choosing the worker: family, model, effort
 
-Model and effort are one decision. The model sets the ceiling (what it can
-understand at all); effort sets how much of that ceiling it uses. Pick the
-model by the hardest part of the task, then the effort that model needs to do
-it reliably:
+Choose model and effort together. Pick the model by the hardest part of the
+task, then select its effort from the table:
 
 | Work (implementing or reviewing) | Claude | Codex |
 |---|---|---|
@@ -20,12 +18,10 @@ it reliably:
 | Tricky logic; substantial review | `sonnet` · `high` | `sol` · `high` |
 | Subtle, security-bearing, cross-cutting, this harness | `opus` · `high` (`xhigh` if needed) | `sol` · `xhigh` |
 
-- A lighter model is already the saving: never pair it with low effort.
-  `low` is not used for delegated work.
+- Never use `low` effort for delegated work.
 - Raise effort while the task is within the model's reach; move up a model
-  when it needs understanding the model lacks. Effort cannot buy capability.
-- Codex when the spec is self-contained: it needs none of this conversation,
-  and it spends Codex's quota instead of Claude's. Claude when the work needs
+  when it needs understanding the model lacks.
+- Use Codex when the spec is self-contained. Use Claude when the work needs
   this conversation's context or judgement about the repo's conventions.
 - Do trivial work (a line, a rename, a config tweak) and ambiguous or
   architectural work yourself. A model or effort the user names wins.
@@ -116,10 +112,9 @@ Herdr each one runs through `pane.sh` (a hook refuses the Agent tool there).
 Its tiers map onto the table: cheap is the first two rows, standard the middle
 two, most capable the last.
 
-- **Which executor.** Subagent-driven development pays an implementer, a
-  review and re-reviews per task; use it for plans with several substantial
-  tasks. A small plan runs inline (`executing-plans`) with the one blind
-  review from the other family at the end.
+- **Which executor.** Use subagent-driven development for plans with several
+  substantial tasks. A small plan runs inline (`executing-plans`) with the one
+  blind review from the other family at the end.
 - **Briefs.** Never write or edit one by hand: `sdd-brief.sh` (run from the
   worktree; usage in its header) fills SDD's own templates and prints the
   path for `pane.sh`. Review briefs are blind by construction; exit 4 means

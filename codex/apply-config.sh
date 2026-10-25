@@ -2,8 +2,6 @@
 # Merge the tracked Codex settings fragments (codex/*.toml) into
 # ~/.codex/config.toml, key by key, leaving everything else in that file alone.
 #
-# Codex rewrites config.toml itself (project trust, hook hashes, counters), so
-# the file cannot be a tracked symlink without dirtying git on every session.
 # Fragments hold single-line `key = value` entries under [table] headers; a key
 # that exists in the target is replaced in place, a missing one is appended to
 # its table, and a missing table is appended to the file. Idempotent, and a

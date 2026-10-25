@@ -54,9 +54,8 @@
 `claude/apply-settings.sh` deletes `advisorModel` on every merge, and
 `claude/hooks/advisor-reset.sh` (`SessionStart`, matcher `startup`) clears it
 whenever a non-worker Claude session starts, including a scripted
-`claude -p`. Claude watches `settings.json`, so a running session can lose
-the advisor at that moment: enable `/advisor fable` only in the one session
-doing the work. The orchestrator proposes it with a reason; the user decides.
+`claude -p`. Enable `/advisor fable` only in the one session doing the work.
+The orchestrator proposes it with a reason; the user decides.
 
 Claude workers launched by `pane.sh` get `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`
 and `HARNESS_LEAF=1` through the `--settings` `env` object, which also turns
@@ -65,8 +64,8 @@ reset hook leave the user's choice alone.
 
 ## pane.sh behaviour
 
-- On a Codex "hooks need review" screen that swallows the first prompt,
-  `pane.sh` sends Escape and resends once. Never answer that screen with
+- On a Codex "hooks need review" screen, `pane.sh` sends Escape and resends
+  the prompt once. Never answer that screen with
   "trust all"; that is the user's call.
 - Quota is judged only when the worker is idle, against Codex's own error
   wording at the bottom of the screen.
@@ -75,8 +74,7 @@ reset hook leave the user's choice alone.
 - A start that fails on a first-run folder-trust prompt is BLOCKED with the
   pane kept: answer the prompt there, then close the pane and rerun the
   launch, because the brief was never sent.
-- A block in the first seconds of a resumed `--wait` is not reported, since
-  the question just answered can still read as `blocked`.
+- A block in the first seconds of a resumed `--wait` is not reported.
 - Herdr's `done` is treated like `idle`.
 - The report path exists only once the worker writes it; take it from the
   first line `pane.sh` prints.

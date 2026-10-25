@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Claude Code status line — model, effort, context, 5h/7d rate limits.
-# Adapted from https://github.com/fedddorov/claude-code-status-bar
 # Wire up in ~/.claude/settings.json:
 #   "statusLine": {"type": "command", "command": "bash ~/.claude/harness/claude/statusline.sh"}
 # The session's time locale, kept for naming reset days before LC_ALL=C below.
 time_locale=${LC_ALL:-${LC_TIME:-${LANG:-C}}}
-export LC_ALL=C   # printf %f rejects "72.4" under comma-decimal locales
+export LC_ALL=C   # Use the C locale for numeric formatting.
 input=$(cat)
 IFS=$'\x1f' read -r model effort used total win fiveh fiveh_at week week_at < <(
   jq -r '[
@@ -44,17 +43,14 @@ hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high|xhigh|max
 
 # FiraCode's own progress bar (U+EE00-EE05): an outlined, round-ended bar
 # whose cells fill from the left. Empty left/middle/right, then filled
-# left/middle/right. Written as UTF-8 bytes: private-use glyphs typed
-# literally vanish in some tools, and $'\U…' is not expanded under LC_ALL=C.
+# left/middle/right, encoded as UTF-8 bytes.
 PB=($'\xee\xb8\x80' $'\xee\xb8\x81' $'\xee\xb8\x82'
     $'\xee\xb8\x83' $'\xee\xb8\x84' $'\xee\xb8\x85')
 BAR_CELLS=8
 
-# bar <percent> <color>: the whole bar in one colour, so the outline stays
-# continuous where the fill stops. The caps are mostly border, so k filled
-# cells look like (k-0.4)/(n-0.6) of the bar, not k/n (measured from the
-# rendered glyphs); the cell count is the one whose look is nearest the
-# percent. Plain k/n rounding drew 76% as five of six cells, which looked 86%.
+# bar <percent> <color>: the whole bar in one colour with a continuous outline.
+# The cell count rounds percent/100*(n-0.6)+0.4 to the nearest integer,
+# clamped to 0..n, with zero percent producing no filled cells.
 bar() {
   local filled i k out=""
   filled=$(awk -v u="$1" -v n="$BAR_CELLS" 'BEGIN{f=int(u/100*(n-0.6)+0.4+0.5);if(u<=0)f=0;if(f<0)f=0;if(f>n)f=n;print f}')
@@ -68,8 +64,7 @@ bar() {
 
 # pie <percent> <color>: one cell for the context meter, a circle that fills
 # clockwise in eighths: nf-md-circle_outline, then nf-md-circle_slice_1..8
-# (U+F0766, U+F0A9E-F0AA5). Written as UTF-8 bytes: private-use glyphs typed
-# literally vanish in some tools, and $'\U…' is not expanded under LC_ALL=C.
+# (U+F0766, U+F0A9E-F0AA5), encoded as UTF-8 bytes.
 PIE=($'\xf3\xb0\x9d\xa6' $'\xf3\xb0\xaa\x9e' $'\xf3\xb0\xaa\x9f'
      $'\xf3\xb0\xaa\xa0' $'\xf3\xb0\xaa\xa1' $'\xf3\xb0\xaa\xa2'
      $'\xf3\xb0\xaa\xa3' $'\xf3\xb0\xaa\xa4' $'\xf3\xb0\xaa\xa5')

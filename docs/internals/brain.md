@@ -73,6 +73,7 @@ documentation, a skill, a global instruction, memory. It runs only in the
 main checkout's orchestrator; workers and worktree sessions report lessons
 instead. Harness changes are diff proposals that need the user's yes, then a
 cross-family review in a worktree before merging. Any harness text it adds
-states the rule and its reason only; a story worth keeping goes to memory.
+describes only what exists and how to use it; decisions, lessons, traps and
+history go to memory.
 Its injection guard covers the skill only: native memory capture and
 auto-dream bypass it, and the audit does not establish provenance.

@@ -199,7 +199,7 @@ case "$1 $2" in
   "agent get")
     g=$(( $(cat "$S/gets" 2>/dev/null || echo 0) + 1 )); echo "$g" > "$S/gets"
     st=$(cat "$S/status" 2>/dev/null || echo idle)
-    # --wait: the answered question lingers as blocked for two polls, then work resumes
+    # --wait fixture: blocked for two polls, then working
     if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
@@ -211,7 +211,7 @@ case "$1 $2" in
           { echo "fixing the quota check, upgrade to the new usage limit text"; seq 20; echo "Allow command? y/n"; } > "$S/screen" ;;
         tailmention) st=blocked; printf 'Run: grep "usage limit reached" pane.sh\nAllow command? y/n\n' > "$S/screen" ;;
         noreport) st=idle ;;
-        # a report whose shape breaks the contract (seen: concerns as one string)
+        # a report whose concerns field is a string instead of an array
         badreport) echo "${report/\"concerns\":[]/\"concerns\":\"x\"}" > "$(cat "$S/report")"; st=idle ;;
         extrakey) echo "${report%\}},\"extra\":1}" > "$(cat "$S/report")"; st=idle ;;
         twoobjects) printf '%s\n%s\n' "$report" "$report" > "$(cat "$S/report")"; st=idle ;;
@@ -253,20 +253,18 @@ if grep -qx -- claude "$tmp/state-claude/start" && grep -A1 -x -- --model "$tmp/
 then echo "ok   pane claude: launched as a sonnet leaf worker"; else echo "FAIL pane claude: launch args $(cat "$tmp/state-claude/start")"; fail=1; fi
 if grep -qx -- codex "$tmp/state-happy/start" && grep -A1 -x -- -m "$tmp/state-happy/start" | grep -qx gen9-sol
 then echo "ok   pane codex: launched with the resolved model"; else echo "FAIL pane codex: launch args $(cat "$tmp/state-happy/start")"; fail=1; fi
-# The pane opens in the caller's directory (an SDD worktree), not the
-# orchestrator's: a worker's sandbox is rooted there.
+# The pane opens in the caller's directory (an SDD worktree).
 if grep -A1 -x -- --cwd "$tmp/state-happy/split" | tail -1 | grep -qxF -- "$PWD"
 then echo "ok   pane split: opens in the caller's directory"; else echo "FAIL pane split: args $(cat "$tmp/state-happy/split")"; fail=1; fi
-# Claude workers start with Superpowers off: a leaf that brainstorms waits for
-# an approval no one gives. Codex has no such switch for a remote plugin, so
-# no dead override is passed.
+# Claude workers start with Superpowers and the advisor disabled and HARNESS_LEAF set.
+# Codex launch arguments omit Superpowers settings.
 if grep -A1 -x -- --settings "$tmp/state-claude/start" | tail -1 \
      | jq -e '.enabledPlugins["superpowers@anthropic-plugin-directory"] == false
               and .env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL == "1"
               and .env.HARNESS_LEAF == "1"' >/dev/null 2>&1
 then echo "ok   claude worker launch: advisor disabled and leaf marked"; else echo "FAIL claude worker launch: missing worker settings"; fail=1; fi
 if ! grep -q superpowers "$tmp/state-happy/start"
-then echo "ok   pane codex: no dead plugin override"; else echo "FAIL pane codex: passes an override Codex ignores"; fail=1; fi
+then echo "ok   pane codex: launch arguments omit Superpowers settings"; else echo "FAIL pane codex: unexpected Superpowers launch setting"; fail=1; fi
 missing=
 for k in status summary files_changed commands_run tests_run blockers concerns; do
   grep -q "\b$k\b" "$tmp/state-claude/msg" || missing="$missing $k"
@@ -285,7 +283,7 @@ done
 verdict column      0 REPORT   yes
 if [ "$(tr '\n' ' ' < "$tmp/state-column/split")" = "pane split --pane p9 --direction down --cwd $PWD --ratio 0.5 --no-focus " ]
 then echo "ok   pane column: splits the last delegate in this tab"; else echo "FAIL pane column: split $(cat "$tmp/state-column/split")"; fail=1; fi
-verdict hooks       0 REPORT   yes    # hook-review screen swallowed the first prompt
+verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
 verdict quota       5 QUOTA    yes
@@ -312,7 +310,7 @@ verdict splitfail   7 NOSTART  no
 verdict trustblock  3 BLOCKED  no    # a first-run trust prompt stays answerable
 verdict startfail   7 NOSTART  yes   # any other start failure still closes the pane
 verdict gone        6 GONE     no
-verdict wait        0 REPORT   no  --wait p1 "$tmp/handoff/w.json"   # stale blocked state is not a new block; --wait keeps the pane
+verdict wait        0 REPORT   no  --wait p1 "$tmp/handoff/w.json"   # --wait allows an initial blocked grace period and keeps the pane
 KEEP=0 verdict waitclose 0 REPORT yes --wait p1 "$tmp/handoff/wc.json"   # DELEGATE_KEEP=0 still closes it
 verdict timeout     124 TIMEOUT no --wait p1 "$tmp/handoff/none.json" 0
 # --resume: a follow-up prompt into a kept pane, with a fresh report path; the
@@ -322,7 +320,7 @@ verdict resume    0 REPORT  no --resume p1 "$tmp/fix.md"
 if grep -qF 'Fix the finding: tests/x.sh:3 asserts nothing.' "$tmp/state-resume/msg" \
    && grep -q "write your report to $tmp/handoff/resume-p1-[A-Za-z0-9]*.json as JSON with exactly these keys" "$tmp/state-resume/msg"
 then echo "ok   pane resume: message plus a fresh report path"; else echo "FAIL pane resume: prompt was '$(cat "$tmp/state-resume/msg" 2>/dev/null)'"; fail=1; fi
-verdict hooksresume 0 REPORT no --resume p1 "$tmp/fix.md" 1   # a resume prompt swallowed by the hook screen
+verdict hooksresume 0 REPORT no --resume p1 "$tmp/fix.md" 1   # hook-review Escape and resend on resume
 if [ "$(cat "$tmp/state-hooksresume/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooksresume/prompts")" = 2 ]
 then echo "ok   pane resume hooks: one escape, one resend"; else echo "FAIL pane resume hooks: not recovered"; fail=1; fi
 # Two resumes of one pane in the same second get different report paths.

@@ -13,9 +13,8 @@ the session is interactive.
   fixing them.
 - Read git state freely, but never change it: no `add`, `commit`, `push`,
   `stash`, `reset`, branch, merge, rebase, tag, worktree or `git config`. Leave
-  every change unstaged in the working tree. (`git stash` silently swallows the
-  human's uncommitted work.) The one exception: an orchestrator that gives you
-  an isolated worktree and asks for a commit.
+  every change unstaged in the working tree. The one exception: an
+  orchestrator that gives you an isolated worktree and asks for a commit.
 - Before any work, including a review, read `AGENTS.md` or `CLAUDE.md` at the
   repository root and follow it; a nested `AGENTS.md` wins for its subtree.
 

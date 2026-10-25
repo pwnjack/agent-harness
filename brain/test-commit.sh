@@ -56,7 +56,7 @@ fixture() {
   git -C "$projects" config brain.enabled true || exit 1
   git -C "$projects" config brain.remote "$remote" || exit 1
   git -C "$projects" remote add origin "$remote" || exit 1
-  # During RED the template does not exist yet; use the specified whitelist.
+  # Copy brain/gitignore when present; otherwise use the inline whitelist.
   if [ -f "$here/gitignore" ]; then cp -- "$here/gitignore" "$projects/.gitignore"
   else
     printf '%s\n' '/*' '!/.gitignore' '!/*/' '/-tmp*/' '/*/*' '!/*/memory/' \

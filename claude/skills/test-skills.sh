@@ -35,7 +35,7 @@ done < <(grep -rhoE '~/\.claude/skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE
 check "global instructions name an existing skill" \
   bash -c 'grep -q "\`delegate\` skill" "$1" && test -f "$2/delegate/SKILL.md"' _ "$claude/CLAUDE.global.md" "$here"
 
-# --- no pinned model identifiers in instruction text (names go stale) ---------
+# --- no pinned model identifiers in instruction text ---------
 check "no pinned model ids in skill or instruction text" \
   bash -c '! grep -rEq "claude-(opus|sonnet|haiku|fable)-[0-9]|gpt-[0-9]" "$1" "$2" --include="*.md"' \
   _ "$here" "$claude/CLAUDE.global.md"

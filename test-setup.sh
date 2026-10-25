@@ -57,7 +57,7 @@ setup() {
   return 1
 }
 
-# Today's links can be dangling: the old dotfiles clone need not be present.
+# Set up dangling instruction and skill links.
 ln -s -- "$HOME/.config/claude/CLAUDE.global.md" "$CLAUDE_CONFIG_DIR/CLAUDE.md"
 ln -s -- "$HOME/.config/claude/skills/delegate" "$CLAUDE_CONFIG_DIR/skills/delegate"
 ln -s -- "$HOME/.config/codex/AGENTS.global.md" "$CODEX_HOME/AGENTS.md"
@@ -281,8 +281,7 @@ if cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore" \
   ok 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'
 else no 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'; fi
 
-# systemd rejects quote characters in executable names, even correctly escaped.
-# Check quoting separately from verification of the normal installation above.
+# Check executable-path quoting for a clone path containing quotes and backslashes.
 prepare_clone "$tmp/clone with a \"quote and a \\slash" || exit 1
 brain_home quoted
 setup --brain
@@ -314,7 +313,7 @@ mkdir -p -- "$HOME"
 if [ "$?" -eq 0 ]; then ok 'brain: relative config resolved to an absolute projects argument'
 else no 'brain: relative config resolved to an absolute projects argument'; fi
 
-# Default setup must not redirect Claude's global config to ~/.claude/.claude.json.
+# Default setup leaves CLAUDE_CONFIG_DIR unset for every Claude invocation.
 for mode in plain brain; do
   brain_home "unset-$mode"
   : > "$TEST_CLAUDE_CONFIG_LOG"

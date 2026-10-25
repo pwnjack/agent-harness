@@ -2,10 +2,9 @@
 # Merge the tracked Claude Code settings (claude/settings.json) into
 # ~/.claude/settings.json, removing advisorModel and keeping other live keys.
 #
-# The live file cannot be a tracked symlink: Claude Code, plugins and Herdr all
-# write into it, often with absolute machine paths. So the tracked copy holds
-# only the settings authored here and is merged in: objects merge key by key,
-# and each tracked hook group is appended after removing, from the live groups,
+# The tracked copy holds only the settings authored here.
+# Objects merge key by key, and each tracked hook group is appended after
+# removing, from the live groups,
 # only the hooks that run the same script (matched by file name) — other hooks
 # sharing a group survive, a group left empty is dropped, re-running never
 # duplicates a hook, and a stale absolute-path copy of it is replaced. A live

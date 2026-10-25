@@ -63,8 +63,8 @@ fi
 if "$portable"; then ok 'portability: no GNU-only flags outside EXEMPT'
 else no 'portability: no GNU-only flags outside EXEMPT'; fi
 
-# The harness is a manual for the agent: rules and reasons, never dated
-# history. Real dates (20xx-mm-dd) in tracked Markdown are refused.
+# The harness describes what exists and how to use it.
+# Real dates (20xx-mm-dd) in tracked Markdown are refused.
 lean=true
 if git -C "$repo" ls-files -z -- '*.md' > "$tmp/docs"; then
   while IFS= read -r -d '' file; do

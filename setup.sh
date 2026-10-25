@@ -2,9 +2,9 @@
 # Wire the tracked AI-agent harness (claude/, codex/) into a machine.
 #
 # Only what this repo authored is linked or merged in; everything the agents or
-# other tools write — logins, history, memory, caches, their own hooks — is left
-# to them, so a fresh install stays fresh. Every step is optional: a missing
-# claude, codex or herdr is skipped, never an error. Idempotent.
+# other tools write — logins, history, memory, caches, their own hooks — is
+# excluded. Every step is optional: a missing claude, codex or herdr is
+# skipped, never an error. Idempotent.
 #
 #   ./setup.sh [--dry-run] [--brain]
 # --brain opts this Linux machine into private memory commits and auto-dream.
@@ -14,8 +14,7 @@
 # ~/.claude/CLAUDE.md,
 # codex/AGENTS.global.md -> ~/.codex/AGENTS.md (CLAUDE_CONFIG_DIR and CODEX_HOME
 # are honoured, as the apply scripts do). Anything already at a link target is
-# moved — never deleted — into ~/.local/state/dotfiles-agents-backup/<time>/,
-# outside the directories the agents scan, so an old skill cannot load twice.
+# moved — never deleted — into ~/.local/state/dotfiles-agents-backup/<time>/.
 # Links into this repo whose target is gone (a removed skill or hook) are
 # deleted.
 set -euo pipefail
@@ -58,7 +57,7 @@ if $brain; then
   [ "$visibility" = PRIVATE ] || refuse 'the brain repository must be PRIVATE'
 fi
 claude_dir=$(absolute_path "$claude_dir")
-# Keep the resolved path local; exporting it redirects Claude's global config.
+# Keep the resolved path local; do not export CLAUDE_CONFIG_DIR.
 
 if $brain; then
   projects="$claude_dir/projects"
@@ -136,8 +135,7 @@ else
   echo "codex: not installed, skipping"
 fi
 
-# Herdr owns its agent-state hooks and rewrites them on update, so they are
-# installed through Herdr rather than tracked.
+# Install agent-state hooks through Herdr.
 if have herdr; then
   for agent in claude codex; do
     have "$agent" || continue
