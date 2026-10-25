@@ -1,7 +1,7 @@
 # Agent harness
 
-This repository is a public manual for the agent: instructions only, never
-history, dates or memories. Before changing a part, read its file in
+This repository is a public manual for the agent: it describes what exists and
+how to use it. Decisions, lessons, traps and history go to memory, never here. Before changing a part, read its file in
 `docs/internals/`: `setup.md` (wiring, settings, plugins, removal), `brain.md`
 (memory repository, learning skill), `delegation.md` (panes, models,
 advisor), `tests.md` (suites).

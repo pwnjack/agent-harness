@@ -39,10 +39,9 @@
 # --resume sends the message plus the report request with a fresh report path
 # (an old path would return the previous report at once) and keeps the pane.
 #
-# Claude workers start with Superpowers and the paid advisor off. HARNESS_LEAF
+# Claude workers start with Superpowers and the advisor off. HARNESS_LEAF
 # also keeps their SessionStart hook from resetting the user's advisor choice.
-# Codex ignores config switches for a remote plugin, so its workers keep the
-# skill list (no session hook there); the leaf contract in AGENTS.md governs.
+# Codex workers follow the leaf contract in AGENTS.md.
 set -uo pipefail
 
 here=$(dirname "$(readlink -f "$0")")

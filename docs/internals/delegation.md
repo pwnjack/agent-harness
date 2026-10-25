@@ -3,13 +3,10 @@
 ## Design
 
 - **Cross-family review.** Claude's work is reviewed by Codex and Codex's by
-  Claude, because a model reviewing its own family shares its blind spots.
-  With no usable Codex, a different Claude tier in a fresh context reviews,
-  which is weaker and is reported as such.
-- **Blind review.** The reviewer never sees the implementer's report: told
-  what the implementer worried about, it finds that and stops looking.
-- **One review mandate.** Only `CLAUDE.global.md` requires a review; adding
-  mandates elsewhere makes them stack.
+  Claude. With no usable Codex, a different Claude tier in a fresh context
+  reviews, reported as same-family.
+- **Blind review.** The reviewer never sees the implementer's report.
+- **One review mandate.** Only `CLAUDE.global.md` requires a review.
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call.
   The first worker splits the orchestrator's pane to the right, later ones
@@ -32,18 +29,16 @@
   report path or the marker is present. A leaf never starts agents, so live
   checks that need a Claude or Codex session belong to the orchestrator.
 - **Report contract.** `pane.sh` names the report path and its JSON keys in
-  the prompt, so the contract holds for Claude too. Workers often break the
-  shape, so a malformed report is `NOREPORT` and is moved aside for a fresh
-  one.
+  the prompt, for Claude and Codex alike. A malformed report is `NOREPORT`
+  and is moved aside for a fresh one.
 - **Model names.** Skills name aliases (`sonnet`) and Codex codenames (`sol`),
   never pinned IDs; `test-skills.sh` enforces this. `codex-model.sh` resolves
   a codename to the newest listed model of that name at launch and clamps the
   effort to what the model lists.
-- **Model and effort are one decision.** A lighter model is already a saving,
-  so it is never paired with low effort: the skill's table gives each kind of
-  work one model-and-effort pair per family, and `low` is not used for
-  delegated work. Raise effort while a task is within a model's reach; past
-  that, move up a model. Codex `terra` is off the table but still runs by name.
+- **Model and effort are one decision.** The skill's table gives each kind of
+  work one model-and-effort pair per family; `low` is not used for delegated
+  work. Raise effort while a task is within a model's reach; past
+  that, move up a model.
 - **Opt-in models are an allow-list.** Only Claude `haiku`, `sonnet`, `opus`
   (`CLAUDE_STANDARD` in `pane.sh`) and Codex `luna`, `terra`, `sol`
   (`STANDARD` in `codex-model.sh`) run freely. Every other name, `fable`,
@@ -56,7 +51,6 @@
 
 ## Advisor
 
-The advisor bills usage credits, so it is unset by default.
 `claude/apply-settings.sh` deletes `advisorModel` on every merge, and
 `claude/hooks/advisor-reset.sh` (`SessionStart`, matcher `startup`) clears it
 whenever a non-worker Claude session starts, including a scripted
@@ -69,41 +63,23 @@ and `HARNESS_LEAF=1` through the `--settings` `env` object, which also turns
 Superpowers off. The first disables their advisor tool; the second makes the
 reset hook leave the user's choice alone.
 
-## Herdr and Codex behaviour
+## pane.sh behaviour
 
-- `codex login status` passes with the quota exhausted or with every request
-  failing, so it is not probed; the `QUOTA` verdict is the only reliable
-  signal.
-- Codex can open a "hooks need review" screen that swallows the first prompt
-  while Herdr reports `working`. `pane.sh` sends Escape and resends once.
-  Never answer it with "trust all"; that is the user's call.
-- Check quota only when the worker is idle, against Codex's own error wording
-  at the bottom of the screen; matching any "quota" text misfires on tasks
-  that discuss limits.
+- On a Codex "hooks need review" screen that swallows the first prompt,
+  `pane.sh` sends Escape and resends once. Never answer that screen with
+  "trust all"; that is the user's call.
+- Quota is judged only when the worker is idle, against Codex's own error
+  wording at the bottom of the screen.
 - `--wait` and `--resume` keep the pane on REPORT; `DELEGATE_KEEP=0` makes
   `--wait` close it. QUOTA always closes it.
-- A first-run folder-trust prompt makes `herdr agent start` fail with
-  `agent_not_ready`. `pane.sh` returns BLOCKED and keeps the pane so the
-  prompt can be answered; the brief was never sent, so close the pane and
-  rerun the launch.
-- After `--wait`, the question just answered can read as `blocked` for a
-  moment, so a block in the first seconds of a resumed wait is not reported.
-- A worker's report path does not exist until the worker writes it; take it
-  from the first line `pane.sh` prints, never from a directory listing.
-- Herdr agent names match `^[a-z][a-z0-9_-]{0,31}$`; anything else fails with
-  `invalid_agent_name` and leaves an empty pane. `pane.sh` names each pane
-  `<role>-<model>-<task>`, refuses one that would not fit, and finds the
+- A start that fails on a first-run folder-trust prompt is BLOCKED with the
+  pane kept: answer the prompt there, then close the pane and rerun the
+  launch, because the brief was never sent.
+- A block in the first seconds of a resumed `--wait` is not reported, since
+  the question just answered can still read as `blocked`.
+- Herdr's `done` is treated like `idle`.
+- The report path exists only once the worker writes it; take it from the
+  first line `pane.sh` prints.
+- Pane names follow `<role>-<model>-<task>` and must match
+  `^[a-z][a-z0-9_-]{0,31}$`; `pane.sh` refuses any other name and finds the
   delegate column by the role prefix.
-- Herdr's `done` can mean the turn ended while the TUI is still up; it is
-  treated like `idle`.
-- Headless `codex exec` waits for stdin forever unless given `< /dev/null` (or
-  the prompt on stdin), so wrap it in a timeout.
-- Codex ignores `plugins."<id>".enabled` for a remote plugin, in
-  `config.toml` and through `-c` alike, and `codex exec` loads no remote
-  plugins at all, so only a real pane shows what a worker sees.
-- A Codex worker in a linked worktree asks approval for every `git add` and
-  `git commit` (the metadata lives in the main repository's `.git`). Inspect
-  the diff before approving.
-- Herdr keeps no worker history (`herdr agent read --source scrollback` is
-  empty); a Codex worker's commands and token totals are in its session log
-  under `~/.codex/sessions/<date>/`.

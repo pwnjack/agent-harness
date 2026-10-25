@@ -76,8 +76,3 @@ cross-family review in a worktree before merging. Any harness text it adds
 states the rule and its reason only; a story worth keeping goes to memory.
 Its injection guard covers the skill only: native memory capture and
 auto-dream bypass it, and the audit does not establish provenance.
-
-Not built; add one only when real recurrences call for it: a shared
-`skills/` directory for both agents, lesson capture on the Codex side, review
-of each auto-dream diff, a private cross-project lessons file imported by the
-global `CLAUDE.md`, a report tool, and the macOS port of the exempt files.

@@ -13,16 +13,7 @@
       "Read(~/.local/share/vdirsyncer/**)"
     ]
   },
-  "extraKnownMarketplaces": {
-    "impeccable": {
-      "source": {
-        "source": "github",
-        "repo": "pbakaus/impeccable"
-      }
-    }
-  },
   "enabledPlugins": {
-    "impeccable@impeccable": false,
     "superpowers@anthropic-plugin-directory": true
   },
   "attribution": {

@@ -117,7 +117,7 @@ if have claude; then
   $dry || have_mkt=$(claude plugin marketplace list --json 2>/dev/null | jq -r '.[].name' || true)
   while IFS=$'\t' read -r name src; do
     grep -qxF -- "$name" <<<"$have_mkt" || run claude plugin marketplace add "$src"
-  done < <(jq -r '.extraKnownMarketplaces | to_entries[]
+  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
                   | [.key, (.value.source | .repo // .url)] | @tsv' "$repo/claude/settings.json")
   have_plug=
   $dry || have_plug=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' || true)

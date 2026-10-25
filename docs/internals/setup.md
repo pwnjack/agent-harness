@@ -32,8 +32,7 @@ lets Herdr install its own agent-state hooks, and sets the clone's
   `XDG_CONFIG_HOME`.
 - The harness link is always `$HOME/.claude/harness`, because tracked
   commands name that path literally.
-- Never export `CLAUDE_CONFIG_DIR`: Claude would then read
-  `<config>/.claude.json` instead of `~/.claude.json`.
+- Setup never exports `CLAUDE_CONFIG_DIR`; `test-setup.sh` checks this.
 - `claude/apply-settings.sh` merges objects key by key and replaces a live
   hook that runs the same script file. It drops a live hook whose
   `~/.claude/hooks` script is gone but otherwise never removes a key, so a
@@ -44,8 +43,7 @@ The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
 vdirsyncer data), the Agent-tool guard hook, the advisor-reset hook, the
 status line and the plugin list. `codex/statusline.toml` is the tracked slice
-of Codex's `config.toml`; `codex/features.toml` pins `memories = false`, so
-Codex keeps no memory store of its own.
+of Codex's `config.toml`; `codex/features.toml` sets `memories = false`.
 
 Never track logins, history, memory, caches, plugin checkouts, or anything a
 tool writes into its own config (Herdr's hooks, project trust, auto-mode
@@ -57,39 +55,19 @@ Everything in `CLAUDE.global.md`, `AGENTS.global.md`, a project `CLAUDE.md`,
 the memory index, and each enabled plugin's skill listing and session hooks is
 paid for in every session and every worker. Add a line there only if every
 task needs it; otherwise it belongs in a skill or in `docs/internals/`.
-Tracked files are a manual for the agent: state the rule and its reason, never
-dates, incidents or history.
+Tracked files are a manual for the agent: they describe what exists and how
+to use it. Decisions, lessons, traps and history go to memory.
 
 `test-budgets.sh` caps both global files at their recorded byte budgets,
 fails on dated history in tracked Markdown, and checks shell scripts for
-non-portable flags. Six older files are exempt from the portability check;
+non-portable flags. The six files in `EXEMPT` skip the portability check;
 new scripts target Bash 3.2 and jq.
 
 ## Plugins
 
-- **impeccable** (UI design) is registered but off, because its hooks run on
-  every edit and turn end. Enable it for design work with
-  `claude plugin enable impeccable@impeccable`, and disable it afterwards.
-- **Superpowers** drives the development workflow on Claude only: enabled in
-  the tracked settings and installed by `setup.sh`. Claude pane workers start
-  with it off, because a leaf that brainstorms waits for an approval no one
-  gives. Keep it off Codex: Codex is a worker and reviewer, the SDD briefs
-  already carry the test-first steps, and its skill files would fill each
-  worker's context. Install it there
-  (`codex plugin add superpowers@openai-curated-remote`) only to lead from
-  Codex. Its plans and specs in `docs/superpowers/` stay local and untracked.
-- Do not install mgrep: its session hook forbids Grep and WebSearch, and it
-  uploads the project to a third party. Use `rg`. Nor the
-  `superpowers-extended-cc` fork, which is not the Superpowers above. If
-  either is present, remove it:
-  `claude plugin uninstall superpowers-extended-cc@superpowers-extended-cc-marketplace`,
-  `claude plugin uninstall mgrep@Mixedbread-Grep`, then
-  `claude plugin marketplace remove` for each marketplace, and
-  `codex mcp remove mgrep`. `setup.sh` never removes plugins it did not
-  install.
-- On Codex, keep the ECC plugin and any mgrep MCP server off in
-  `~/.codex/config.toml`: they load hundreds of skills and an MCP server into
-  every worker. This is machine state, not tracked.
+Superpowers is the only plugin: listed in the tracked settings and installed
+by `setup.sh`. `pane.sh` starts Claude workers without it. Its plans and specs
+in `docs/superpowers/` stay local and untracked.
 
 ## Status lines
 
