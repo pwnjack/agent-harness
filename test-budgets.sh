@@ -2,7 +2,7 @@
 # Keep always-loaded instructions small and new shell code portable to macOS.
 set -uo pipefail
 
-BUDGET_CLAUDE_GLOBAL=1112
+BUDGET_CLAUDE_GLOBAL=1457
 BUDGET_AGENTS_GLOBAL=2094
 EXEMPT='claude/statusline.sh claude/hooks/test-agent-guard.sh claude/skills/delegate/pane.sh claude/skills/delegate/test-delegate.sh claude/skills/delegate/test-sdd-brief.sh claude/skills/delegate/sdd-brief.sh'
 
