@@ -9,6 +9,7 @@ the installed tools; `./setup.sh --dry-run` previews those changes.
 
 - `claude/`: Claude Code global instructions, skills, hooks and settings.
 - `codex/`: Codex global instructions and curated configuration.
+- `brain/`: private memory audit, commit scripts and user timer templates.
 - `githooks/`: staged-tree export and the pre-commit test gate.
 - `docs/`: internals and contributor reference material.
 
