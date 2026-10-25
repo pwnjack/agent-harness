@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code status line — model, effort, context, 5h/7d rate limits.
+# Adapted from https://github.com/fedddorov/claude-code-status-bar (MIT).
 # Wire up in ~/.claude/settings.json:
 #   "statusLine": {"type": "command", "command": "bash ~/.claude/harness/claude/statusline.sh"}
 # The session's time locale, kept for naming reset days before LC_ALL=C below.
