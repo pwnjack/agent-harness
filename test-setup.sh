@@ -8,9 +8,14 @@ trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/home/.claude" CODEX_HOME="$tmp/home/.codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
 mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR/skills" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin"
-for command in claude codex ssh-add; do
+for command in codex ssh-add; do
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command"
 done
+cat > "$tmp/bin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${CLAUDE_CONFIG_DIR-UNSET}" >> "$TEST_CLAUDE_CONFIG_LOG"
+SH
+export TEST_CLAUDE_CONFIG_LOG="$tmp/claude-config.log"
 cat > "$tmp/bin/uname" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "${TEST_UNAME:-Linux}"
@@ -293,5 +298,18 @@ mkdir -p -- "$HOME"
 )
 if [ "$?" -eq 0 ]; then ok 'brain: relative config resolved to an absolute projects argument'
 else no 'brain: relative config resolved to an absolute projects argument'; fi
+
+# Default setup must not redirect Claude's global config to ~/.claude/.claude.json.
+for mode in plain brain; do
+  brain_home "unset-$mode"
+  : > "$TEST_CLAUDE_CONFIG_LOG"
+  if (
+    unset CLAUDE_CONFIG_DIR
+    if [ "$mode" = brain ]; then setup --brain; else setup; fi
+  ) && [ -s "$TEST_CLAUDE_CONFIG_LOG" ] \
+    && ! grep -qvxF -- UNSET "$TEST_CLAUDE_CONFIG_LOG"; then
+    ok "$mode setup: every Claude invocation inherits unset CLAUDE_CONFIG_DIR"
+  else no "$mode setup: every Claude invocation inherits unset CLAUDE_CONFIG_DIR"; fi
+done
 
 exit "$fail"

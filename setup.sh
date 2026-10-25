@@ -58,7 +58,7 @@ if $brain; then
   [ "$visibility" = PRIVATE ] || refuse 'the brain repository must be PRIVATE'
 fi
 claude_dir=$(absolute_path "$claude_dir")
-export CLAUDE_CONFIG_DIR="$claude_dir"
+# Keep the resolved path local; exporting it redirects Claude's global config.
 
 if $brain; then
   projects="$claude_dir/projects"
