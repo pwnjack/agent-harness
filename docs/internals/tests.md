@@ -1,0 +1,37 @@
+# Tests
+
+`./test.sh` runs every tracked `test-*.sh`; `./test.sh --list` lists them. The
+pre-commit gate runs them against a private export of the staged tree. Tests
+use a temporary HOME, config and state directories and stub machine commands,
+including Herdr, so they never install hooks or units on the host.
+
+- `test-setup.sh`: upgrades and fresh installs, the fixed harness link with
+  custom config paths, settings preservation, dry runs, the private Linux-only
+  brain setup, refusal of foreign repositories, rendered units, repeat runs,
+  and the removal block in `docs/internals/setup.md` run verbatim.
+- `test-budgets.sh`: byte budgets for the global instructions, no dated
+  history in tracked Markdown, and portable flags outside the exemption list.
+- `brain/test-audit.sh`: memory index links, ordering, secret diagnostics,
+  nested paths, excluded files and the 4096-byte warning.
+- `brain/test-commit.sh`: whitelist, path and secret refusals, shared-index
+  synchronisation, stale locks and concurrent updates, symlinked project
+  paths, commit identity, push URL checks, SSH deferral, push diagnostics and
+  retries.
+- `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
+  IDs, plugin marketplaces.
+- `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
+  gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
+  recovery, limit text that is not a quota hit, malformed reports, `--wait`
+  and `--resume` keeping the pane, the trust-prompt BLOCKED, and the worker
+  settings that disable Superpowers and the advisor.
+- `claude/skills/delegate/test-sdd-brief.sh`: every brief kind is filled and
+  blind, bad ranges and changed templates are refused, hostile titles and
+  file names stay literal; against stand-in templates. Under `./test.sh` the
+  check against the installed plugin's own templates is skipped, because HOME
+  is sandboxed; run the suite directly to include it.
+- `claude/hooks/test-agent-guard.sh`: the guard denies inside Herdr, is silent
+  outside it, and is registered once after two settings merges.
+- `claude/hooks/test-advisor-reset.sh`: startup registration, removal of
+  `advisorModel`, worker bypass, settings mode and malformed settings.
+- `codex/test-codex-config.sh`: `memories = false`, preservation of unrelated
+  settings and repeat merges.

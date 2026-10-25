@@ -63,4 +63,20 @@ fi
 if "$portable"; then ok 'portability: no GNU-only flags outside EXEMPT'
 else no 'portability: no GNU-only flags outside EXEMPT'; fi
 
+# The harness is a manual for the agent: rules and reasons, never dated
+# history. Real dates (20xx-mm-dd) in tracked Markdown are refused.
+lean=true
+if git -C "$repo" ls-files -z -- '*.md' > "$tmp/docs"; then
+  while IFS= read -r -d '' file; do
+    if grep -nE -- '(^|[^0-9])20[0-9]{2}-[01][0-9]-[0-3][0-9]([^0-9]|$)' "$repo/$file" > "$tmp/dates"; then
+      lean=false
+      while IFS= read -r match; do printf '  %s:%s\n' "$file" "$match"; done < "$tmp/dates"
+    fi
+  done < "$tmp/docs"
+else
+  lean=false
+fi
+if "$lean"; then ok 'lean: no dated history in tracked Markdown'
+else no 'lean: no dated history in tracked Markdown'; fi
+
 exit "$fail"

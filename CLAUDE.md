@@ -1,6 +1,10 @@
 # Agent harness
 
-Read `docs/internals.md` before changing anything.
+This repository is a public manual for the agent: instructions only, never
+history, dates or memories. Before changing a part, read its file in
+`docs/internals/`: `setup.md` (wiring, settings, plugins, removal), `brain.md`
+(memory repository, learning skill), `delegation.md` (panes, models,
+advisor), `tests.md` (suites).
 
 This repository tracks only what was authored here: the `delegate` and
 `compound-learning` skills, brain scripts, global instructions and curated
@@ -12,7 +16,7 @@ settings. Never track logins, memory, caches or tool-written configuration.
 - `codex/`: Codex global instructions and curated configuration.
 - `brain/`: private memory audit, commit scripts and user timer templates.
 - `githooks/`: staged-tree export and the pre-commit test gate.
-- `docs/`: internals and contributor reference material.
+- `docs/internals/`: one manual per part, read before changing it.
 
 Run `./test.sh` before committing. It discovers every tracked `test-*.sh`,
 prints one result per suite and shows the output of failing suites.

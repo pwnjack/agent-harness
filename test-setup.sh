@@ -339,7 +339,7 @@ awk '
   section && /^```bash$/ { block = 1; next }
   block && /^```$/ { exit }
   block { print }
-' "$source_repo/docs/internals.md" > "$tmp/removal.sh"
+' "$source_repo/docs/internals/setup.md" > "$tmp/removal.sh"
 if [ -s "$tmp/removal.sh" ] && bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
    && [ ! -L "$HOME/.claude/harness" ] \
    && [ ! -L "$CLAUDE_CONFIG_DIR/CLAUDE.md" ] \
