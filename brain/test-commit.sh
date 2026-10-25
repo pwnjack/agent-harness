@@ -66,6 +66,29 @@ run
 if [ "$result" -eq 0 ] && ! head_oid >/dev/null && [ ! -s "$case_dir/stderr" ]; then ok 'disabled: quiet exit 0, no commit'
 else no 'disabled: quiet exit 0, no commit'; fi
 
+for whitelist_state in missing altered; do
+  fixture
+  export SSH_ADD_RESULT=1
+  run
+  before=$(head_oid)
+  export SSH_ADD_RESULT=0
+  printf 'Private transcript.\n' > "$projects/-home-u-proj/transcript.jsonl"
+  printf 'Consolidation state.\n' > "$memory/.consolidate-lock"
+  printf 'Updated memory.\n' >> "$memory/note.md"
+  if [ "$whitelist_state" = missing ]; then
+    rm -- "$projects/.gitignore"
+  else
+    sed '1d' "$projects/.gitignore" > "$case_dir/altered-ignore"
+    mv -- "$case_dir/altered-ignore" "$projects/.gitignore"
+  fi
+  run
+  if [ "$result" -eq 1 ] && [ -n "$before" ] && [ "$(head_oid)" = "$before" ] \
+     && [ -z "$(remote_oid)" ] && [ ! -s "$case_dir/stdout" ] \
+     && [ "$(cat -- "$case_dir/stderr")" = 'brain: refusing missing or altered .gitignore whitelist' ]; then
+    ok ".gitignore $whitelist_state: exit 1, no new commit, nothing pushed, one log line"
+  else no ".gitignore $whitelist_state: exit 1, no new commit, nothing pushed, one log line"; fi
+done
+
 fixture
 run
 if [ "$result" -eq 0 ] && tracked .gitignore && tracked -home-u-proj/memory/note.md \
