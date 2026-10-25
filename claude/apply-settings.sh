@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merge the tracked Claude Code settings (claude/settings.json) into
-# ~/.claude/settings.json, leaving every other key in that file alone.
+# ~/.claude/settings.json, removing advisorModel and keeping other live keys.
 #
 # The live file cannot be a tracked symlink: Claude Code, plugins and Herdr all
 # write into it, often with absolute machine paths. So the tracked copy holds
@@ -24,14 +24,19 @@ mkdir -p "$(dirname "$target")"
 
 tmp="$(mktemp "$target.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
+cp -p -- "$target" "$tmp"
 
 # A fresh machine has no hooks directory yet: that is "no hooks", not an error.
-present=$( { find "$(dirname "$target")/hooks" -maxdepth 1 -name '*.sh' -printf '%f\n' 2>/dev/null || true; } | jq -R . | jq -s .)
+dir="$(dirname "$target")/hooks"
+present=$(for f in "$dir"/*.sh; do
+  [ -e "$f" ] || [ -L "$f" ] || continue
+  printf '%s\n' "${f##*/}"
+done | jq -R . | jq -s .)
 
 jq -s --argjson present "${present:-[]}" '
   def script: (.command // "") | (capture("(?<s>[^/\\s\"\\x{27}]+\\.sh)").s // .);
   .[0] as $live | .[1] as $mine
-  | ($live * ($mine | del(.hooks)))
+  | ($live * ($mine | del(.hooks))) | del(.advisorModel)
   | .hooks = (($live.hooks // {}) as $lh
       | reduce (($mine.hooks // {}) | to_entries[]) as $e ($lh;
           ([$e.value[].hooks[]? | script]) as $ours
@@ -46,7 +51,6 @@ jq -s --argjson present "${present:-[]}" '
       | with_entries(select(.value | length > 0)))
 ' "$target" "$src" > "$tmp"
 
-chmod --reference="$target" "$tmp" 2>/dev/null || true
 if cmp -s "$tmp" "$target"; then
   echo "claude: settings already up to date"
 else

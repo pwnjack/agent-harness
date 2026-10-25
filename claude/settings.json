@@ -1,7 +1,7 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "bash ~/.config/claude/statusline.sh"
+    "command": "bash ~/.claude/harness/claude/statusline.sh"
   },
   "permissions": {
     "deny": [
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ~/.config/claude/hooks/agent-guard.sh",
+            "command": "sh ~/.claude/harness/claude/hooks/agent-guard.sh",
             "timeout": 5
           }
         ]

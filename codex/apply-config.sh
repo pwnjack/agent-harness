@@ -81,5 +81,9 @@ if cmp -s "$tmp" "$target"; then
   echo "codex: config.toml already up to date"
 else
   cat "$tmp" > "$target"   # rewrite in place: keeps the file's mode and inode
-  echo "codex: merged $(basename -a "${fragments[@]}" | paste -sd' ') into $target"
+  names=
+  for fragment in "${fragments[@]}"; do
+    names="${names:+$names }${fragment##*/}"
+  done
+  echo "codex: merged $names into $target"
 fi

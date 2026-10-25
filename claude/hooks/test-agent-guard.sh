@@ -9,8 +9,14 @@ repo=$(cd "$here/../.." && pwd)
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
-mkdir -p -- "$HOME/.config/claude/hooks" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
-ln -s -- "$here/agent-guard.sh" "$HOME/.config/claude/hooks/agent-guard.sh"
+mkdir -p -- "$HOME/.claude" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin"
+ln -s -- "$repo" "$HOME/.claude/harness"
+for command in systemctl uname gh ssh-add; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command"
+done
+printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "$tmp/bin/herdr"
+chmod +x -- "$tmp"/bin/*
+export PATH="$tmp/bin:$PATH"
 fail=0
 ok() { echo "ok   $1"; }
 no() { echo "FAIL $1"; fail=1; }
@@ -35,7 +41,7 @@ done
 
 # The registered command runs the script in the repo, like the status line, so
 # it works whatever CLAUDE_CONFIG_DIR is; run it as Claude would, through a shell.
-cmd='sh ~/.config/claude/hooks/agent-guard.sh'
+cmd='sh ~/.claude/harness/claude/hooks/agent-guard.sh'
 count() { jq --arg c "$cmd" '[.hooks.PreToolUse[]? | select(.matcher == "Agent") | .hooks[] | select(.command == $c)] | length' "$1"; }
 if [ "$(count "$repo/claude/settings.json")" = 1 ]; then ok "tracked settings register the guard on Agent"
 else no "tracked settings: guard not registered on Agent"; fi

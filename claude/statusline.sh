@@ -2,7 +2,7 @@
 # Claude Code status line — model, effort, context, 5h/7d rate limits.
 # Adapted from https://github.com/fedddorov/claude-code-status-bar
 # Wire up in ~/.claude/settings.json:
-#   "statusLine": {"type": "command", "command": "bash ~/.config/claude/statusline.sh"}
+#   "statusLine": {"type": "command", "command": "bash ~/.claude/harness/claude/statusline.sh"}
 # The session's time locale, kept for naming reset days before LC_ALL=C below.
 time_locale=${LC_ALL:-${LC_TIME:-${LANG:-C}}}
 export LC_ALL=C   # printf %f rejects "72.4" under comma-decimal locales

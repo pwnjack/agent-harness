@@ -8,7 +8,8 @@
 #
 #   ./setup.sh [--dry-run]
 #
-# Links: claude/skills/*/ -> ~/.claude/skills/, claude/CLAUDE.global.md ->
+# Links: this repo -> ~/.claude/harness, claude/skills/*/ -> ~/.claude/skills/,
+# claude/CLAUDE.global.md ->
 # ~/.claude/CLAUDE.md,
 # codex/AGENTS.global.md -> ~/.codex/AGENTS.md (CLAUDE_CONFIG_DIR and CODEX_HOME
 # are honoured, as the apply scripts do). Anything already at a link target is
@@ -45,6 +46,9 @@ link() {
 }
 
 have jq || { echo "agents: jq is required; skipping harness setup" >&2; exit 1; }
+
+# Commands in tracked settings use this fixed path even with a custom config.
+link "$repo" "$HOME/.claude/harness"
 
 if have claude; then
   echo "claude: linking harness"
