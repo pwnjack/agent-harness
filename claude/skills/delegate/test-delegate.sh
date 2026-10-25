@@ -179,7 +179,11 @@ case "$1 $2" in
   "pane split") printf '%s\n' "$@" > "$S/split"
                 [ "$SCEN" = splitfail ] && echo '{}' || echo '{"result":{"pane_id":"p1"}}' ;;
   "pane close") touch "$S/closed" ;;
-  "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"; exit 0 ;;
+  "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
+                case "$SCEN" in
+                  trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
+                  startfail) echo "error: agent crashed" > "$S/screen"; exit 1 ;;
+                esac; exit 0 ;;
   "agent read") cat "$S/screen" 2>/dev/null ;;
   "agent send-keys") echo "$4" >> "$S/keys"; : > "$S/screen" ;;
   "agent prompt")
@@ -196,10 +200,10 @@ case "$1 $2" in
     g=$(( $(cat "$S/gets" 2>/dev/null || echo 0) + 1 )); echo "$g" > "$S/gets"
     st=$(cat "$S/status" 2>/dev/null || echo idle)
     # --wait: the answered question lingers as blocked for two polls, then work resumes
-    if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
+    if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
-        happy|wait|claude|keep|keepwait|resume|inherit|degrade|column) echo "$report" > "$(cat "$S/report")"; st=idle ;;
+        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
@@ -230,6 +234,7 @@ verdict() {
   [ $# -gt 0 ] || set -- codex sol medium impl "t-$sc" "$b"
   [ "$sc" = wait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/w.json" > "$st/report"; }
   [ "$sc" = keepwait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/kw.json" > "$st/report"; }
+  [ "$sc" = waitclose ] && { echo blocked > "$st/status"; echo "$tmp/handoff/wc.json" > "$st/report"; }
   out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 \
     DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="${CACHE:-$tmp/real.json}" CODEX_CONFIG="$tmp/config-ok.toml" \
     DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 DELEGATE_KEEP="${KEEP:-}" \
@@ -304,8 +309,11 @@ then echo "ok   pane truncreport: left in place, not judged"; else echo "FAIL pa
 verdict nostart     7 NOSTART  no
 verdict gate        7 NOSTART  no
 verdict splitfail   7 NOSTART  no
+verdict trustblock  3 BLOCKED  no    # a first-run trust prompt stays answerable
+verdict startfail   7 NOSTART  yes   # any other start failure still closes the pane
 verdict gone        6 GONE     no
-verdict wait        0 REPORT   yes --wait p1 "$tmp/handoff/w.json"   # stale blocked state is not a new block
+verdict wait        0 REPORT   no  --wait p1 "$tmp/handoff/w.json"   # stale blocked state is not a new block; --wait keeps the pane
+KEEP=0 verdict waitclose 0 REPORT yes --wait p1 "$tmp/handoff/wc.json"   # DELEGATE_KEEP=0 still closes it
 verdict timeout     124 TIMEOUT no --wait p1 "$tmp/handoff/none.json" 0
 # --resume: a follow-up prompt into a kept pane, with a fresh report path; the
 # pane stays open for the next round.

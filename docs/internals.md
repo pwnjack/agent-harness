@@ -255,6 +255,14 @@ global instructions ask the orchestrator to propose it with a reason.
   wording at the bottom of the screen. Matching any "quota" text, or checking
   while blocked, flagged tasks that merely talked about limits as quota hits
   and turned Codex off for the session.
+- `--wait` keeps the pane by default (`DELEGATE_KEEP=0` closes it on REPORT):
+  an earlier `--wait` closed a reviewer's pane after its report and lost a
+  long session's context (2026-10-25).
+- A first-run folder-trust prompt makes `herdr agent start` fail
+  (`agent_not_ready`). `pane.sh` then returns BLOCKED and keeps the pane so
+  the prompt can be answered; the brief was never sent, so close the pane and
+  rerun. Closing it on that failure made the prompt unanswerable three times
+  in a row (2026-10-25).
 - After `--wait`, the question just answered can still read as `blocked` for a
   moment, so a block in the first seconds of a resumed wait is not reported.
 - Herdr agent names match `^[a-z][a-z0-9_-]{0,31}$` (no spaces, dots or

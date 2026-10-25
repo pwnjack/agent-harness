@@ -28,7 +28,11 @@
 # The pane stays open on BLOCKED, NOREPORT, NOSTART and TIMEOUT: read it,
 # answer or re-prompt with `herdr agent prompt`, then run --wait, and close it
 # with `herdr pane close` when done with it. DELEGATE_KEEP=1 keeps it open on
-# REPORT too, for a fix round that resumes it; QUOTA still closes it.
+# REPORT too, for a fix round that resumes it; QUOTA still closes it. --wait and
+# --resume keep it by default (the caller already owns that pane);
+# DELEGATE_KEEP=0 closes it on REPORT. A start blocked by a first-run
+# folder-trust prompt is BLOCKED with the pane kept: answer it there, then
+# close the pane and rerun, because the brief was never sent.
 # A report that breaks the contract (a missing or extra key, concerns as one
 # string, two objects) is NOREPORT: it is moved to <report>.invalid, so a
 # --wait after re-prompting waits for a fresh one. It is judged from one read.
@@ -87,6 +91,7 @@ finish() { # verdict exit-code [close]
 if [ "${1:-}" = --wait ]; then
   [ $# -ge 3 ] || usage
   pane=$2 report=$3 limit=$(( ${4:-45} * 60 )) waiting=1 landed=1
+  DELEGATE_KEEP=${DELEGATE_KEEP:-1}
 elif [ "${1:-}" = --resume ]; then
   [ $# -ge 3 ] || usage
   [ -r "$3" ] || { echo "message not readable: $3" >&2; exit 2; }
@@ -185,8 +190,13 @@ if [ -n "$kind" ]; then
   pane=$(herdr pane split "${split[@]}" --cwd "$PWD" --ratio 0.5 --no-focus \
     | jq -r '.result.pane_id // .result.pane.pane_id // empty')
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
-  herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null \
-    || finish NOSTART 7 close
+  if ! herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null; then
+    if screen | grep -qiE 'do you trust|trust this (folder|directory)'; then
+      note="first-run folder trust prompt in $pane: answer it there, then close the pane and rerun (the brief was not sent)"
+      finish BLOCKED 3
+    fi
+    finish NOSTART 7 close
+  fi
   if screen | grep -qiE 'do you trust|trust this (folder|directory)|sign in|log ?in to|press enter to continue'; then
     finish NOSTART 7
   fi

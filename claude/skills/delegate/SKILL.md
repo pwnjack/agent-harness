@@ -124,9 +124,9 @@ two, most capable the last.
   the plugin's template changed and the script needs updating.
 - **Workspace.** A worktree (`using-git-worktrees`): the implementer brief
   tells the worker to commit there, the one case a Codex leaf commits.
-- **Implementer.** Its JSON `summary` starts with SDD's status word. Every
-  `pane.sh` call for it carries `DELEGATE_KEEP=1`, `--wait` after a question
-  included, so the pane survives for fix rounds.
+- **Implementer.** Its JSON `summary` starts with SDD's status word. Its launch
+  carries `DELEGATE_KEEP=1` (`--wait` and `--resume` keep the pane by
+  default), so the pane survives for fix rounds.
 - **Fix rounds.** 1-3: write the findings to a file, then
   `pane.sh --resume <pane> <file>` (a fresh report path, pane kept). 4-5: a
   fresh pane one row higher. Close the pane when the task review passes.
