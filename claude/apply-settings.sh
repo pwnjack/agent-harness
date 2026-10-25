@@ -9,8 +9,8 @@
 # only the hooks that run the same script (matched by file name) — other hooks
 # sharing a group survive, a group left empty is dropped, re-running never
 # duplicates a hook, and a stale absolute-path copy of it is replaced. A live
-# hook that runs a script under ~/.claude/hooks which no longer exists (one this
-# repo used to ship) is dropped. Idempotent, and a no-op when Claude Code is not
+# hook that runs a script under ~/.claude/hooks which does not exist is
+# dropped. Idempotent, and a no-op when Claude Code is not
 # installed.
 set -euo pipefail
 

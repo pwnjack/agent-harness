@@ -15,7 +15,7 @@ to report `PRIVATE`. It runs `git init -b main --separate-git-dir`, sets
 `brain/gitignore` as `brain: start`. It reuses its own gitfile, refuses any
 other `.git`, and refreshes `<config>/projects/.gitignore` when the tracked
 whitelist has changed. A re-run changes nothing else. Plain setup creates no
-brain and leaves auto-dream off. Never run `--brain` on a work machine.
+brain and never enables auto-dream (it does not disable an existing setting). Never run `--brain` on a work machine.
 
 The whitelist admits only `.gitignore` and non-hidden Markdown beneath
 `*/memory/`, excluding `-tmp*` projects. Keep the installed `.gitignore`
@@ -46,7 +46,9 @@ journalctl --user -u brain-commit
   moves `main` with `git update-ref <new> <old>`: a branch that moved during
   the run exits successfully and retries next time; any other update failure
   logs Git's error and exits unsuccessfully;
-- then resets the shared index to the new tree, so `git status` stays clean;
+- then resets the shared index to the new tree: unrelated staging in the brain
+  is discarded, worktree files are untouched, and a failed reset is logged
+  without undoing the commit;
 - pushes only when every push URL equals `brain.remote`, with a 60-second
   timeout, `GIT_TERMINAL_PROMPT=0` and `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`;
   `ssh-add -l` returning 1 or 2 defers the push, and a failed push logs the

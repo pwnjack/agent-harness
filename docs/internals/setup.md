@@ -79,7 +79,14 @@ new scripts target Bash 3.2 and jq.
   (`codex plugin add superpowers@openai-curated-remote`) only to lead from
   Codex. Its plans and specs in `docs/superpowers/` stay local and untracked.
 - Do not install mgrep: its session hook forbids Grep and WebSearch, and it
-  uploads the project to a third party. Use `rg`.
+  uploads the project to a third party. Use `rg`. Nor the
+  `superpowers-extended-cc` fork, which is not the Superpowers above. If
+  either is present, remove it:
+  `claude plugin uninstall superpowers-extended-cc@superpowers-extended-cc-marketplace`,
+  `claude plugin uninstall mgrep@Mixedbread-Grep`, then
+  `claude plugin marketplace remove` for each marketplace, and
+  `codex mcp remove mgrep`. `setup.sh` never removes plugins it did not
+  install.
 - On Codex, keep the ECC plugin and any mgrep MCP server off in
   `~/.codex/config.toml`: they load hundreds of skills and an MCP server into
   every worker. This is machine state, not tracked.

@@ -29,8 +29,9 @@ Follow these steps in order:
    Skip the audit when the brain is absent. Search memory, the project
    `CLAUDE.md`, project docs, skills and tests. Strengthen an existing rule
    that was ignored, ideally into a check, rather than copying it. For a
-   recurring lesson, append today's date to `Recurrences: YYYY-MM-DD, ...`
-   as the last line of its body; create that line if absent.
+   lesson that recurs in memory, append today's date to
+   `Recurrences: YYYY-MM-DD, ...` as the last line of that memory's body;
+   dates go in memory only, never in harness or project text.
 4. **Destination.** Choose exactly one destination per mistake: the first of
    test/check, project doc, skill, global instruction, memory that would
    have prevented it.
