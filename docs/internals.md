@@ -81,7 +81,9 @@ to report `PRIVATE`. It uses `git init -b main --separate-git-dir`, sets
 `origin`, `brain.remote` and `brain.enabled=true`, and commits the exact
 `brain/gitignore` as `brain: start`. An existing matching gitfile is reused;
 a foreign `.git`, including a directory, is refused. A completed installation
-can be run again without changing its repository or settings. Plain setup
+can be run again without changing its history or settings. If the tracked
+whitelist has changed, `--brain` refreshes `<config>/projects/.gitignore`;
+the next memory commit records it. Plain setup
 does not create a brain or enable auto-dream.
 
 The whitelist admits only `.gitignore` and non-hidden Markdown files beneath
@@ -101,16 +103,24 @@ systemctl --user status brain-commit.timer
 journalctl --user -u brain-commit
 ```
 
-The commit script uses a temporary index, leaving unrelated staging alone.
+The commit script builds its candidate tree in a temporary index, ignoring
+unrelated staging. It independently validates every candidate path against
+the whitelist, so nested `.gitignore` files cannot admit other files.
+After publishing a commit it resets the shared index to the new tree,
+discarding unrelated staging while leaving worktree files untouched. A failed
+index synchronisation is logged without undoing the commit.
 It scans the whole candidate tree with `git grep --cached` and the named
 patterns in `brain/patterns`; a match refuses the commit and reports the path
 and pattern name, never the secret value. Commits use `brain <brain@localhost>`
 for author and committer and name the changed project keys. If the branch
-moves during the run, it exits successfully and retries next time. It requires
-`main` and refuses to push unless every push URL is exactly `brain.remote`.
+moves during the run, it exits successfully and retries next time. An update
+failure with an unchanged branch logs Git's error and exits unsuccessfully.
+It requires `main` and refuses to push unless every push URL is exactly
+`brain.remote`.
 `ssh-add -l` returning 1 or 2 defers the push; commits stay local until a key
 is available. Pushes have a 60-second timeout, `GIT_TERMINAL_PROMPT=0` and
-`GIT_SSH_COMMAND='ssh -o BatchMode=yes'`. A failed push retries on the next run.
+`GIT_SSH_COMMAND='ssh -o BatchMode=yes'`. A failed push logs the last ten lines
+of Git's output and retries on the next run.
 
 `brain/audit.sh <projects-dir> [project-key...]` is read-only. It reports
 Markdown memories absent from `MEMORY.md`, index links to missing files and
@@ -323,7 +333,7 @@ set -euo pipefail
 config=$(cd -- "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" && pwd -P)
 codex_dir=${CODEX_HOME:-$HOME/.codex}
 units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-harness=$(cd -- "$HOME/.claude/harness" && pwd -P)
+harness=$(readlink "$HOME/.claude/harness")
 settings="$config/settings.json"
 
 systemctl --user disable --now brain-commit.timer
@@ -398,8 +408,10 @@ clone; the removal does not alter other repositories or restore old backups.
   outside the explicit exemption list.
 - `brain/test-audit.sh`: memory index links, ordering, secret diagnostics,
   nested paths, excluded files and the 4096-byte warning.
-- `brain/test-commit.sh`: whitelist and secret refusals, temporary index,
-  commit identity, push URL checks, SSH deferral and retries.
+- `brain/test-commit.sh`: whitelist and secret refusals, shared index
+  synchronisation, stale locks and concurrent updates, symlinked project
+  paths, commit identity, push URL checks, SSH deferral and push diagnostics
+  and retries.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in gate,

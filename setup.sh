@@ -159,6 +159,9 @@ if $brain; then
     GIT_COMMITTER_NAME=brain GIT_COMMITTER_EMAIL=brain@localhost \
       run git -C "$projects" -c commit.gpgsign=false -c core.hooksPath=/dev/null \
         commit -m 'brain: start'
+  elif ! cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore"; then
+    # The next scanned memory commit records whitelist upgrades too.
+    run cp -- "$repo/brain/gitignore" "$projects/.gitignore"
   fi
 
   run mkdir -p -- "$units"

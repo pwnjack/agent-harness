@@ -266,6 +266,21 @@ else
   no 'brain: service and timer installed'
 fi
 
+printf '# Updated whitelist from a harness upgrade.\n' >> "$repo/brain/gitignore"
+head_before_refresh=$(git -C "$projects" rev-parse HEAD)
+setup --brain --dry-run
+if ! cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore" \
+   && [ "$(git -C "$projects" rev-parse HEAD)" = "$head_before_refresh" ]; then
+  ok 'brain: dry run leaves an outdated whitelist and HEAD unchanged'
+else no 'brain: dry run leaves an outdated whitelist and HEAD unchanged'; fi
+setup --brain
+if cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore" \
+   && [ "$(git -C "$projects" rev-parse HEAD)" = "$head_before_refresh" ] \
+   && ! git -C "$projects" diff --quiet -- .gitignore \
+   && git -C "$projects" diff --cached --quiet; then
+  ok 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'
+else no 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'; fi
+
 # systemd rejects quote characters in executable names, even correctly escaped.
 # Check quoting separately from verification of the normal installation above.
 prepare_clone "$tmp/clone with a \"quote and a \\slash" || exit 1
@@ -311,5 +326,32 @@ for mode in plain brain; do
     ok "$mode setup: every Claude invocation inherits unset CLAUDE_CONFIG_DIR"
   else no "$mode setup: every Claude invocation inherits unset CLAUDE_CONFIG_DIR"; fi
 done
+
+# Run the documented removal against links installed through a logical clone
+# path, so its comparisons must use the link target rather than a physical path.
+prepare_clone "$tmp/removal-clone" || exit 1
+ln -s -- "$repo" "$tmp/linked-clone"
+repo="$tmp/linked-clone"
+brain_home removal
+setup --brain
+awk '
+  /^## Removing the harness$/ { section = 1 }
+  section && /^```bash$/ { block = 1; next }
+  block && /^```$/ { exit }
+  block { print }
+' "$source_repo/docs/internals.md" > "$tmp/removal.sh"
+if [ -s "$tmp/removal.sh" ] && bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
+   && [ ! -L "$HOME/.claude/harness" ] \
+   && [ ! -L "$CLAUDE_CONFIG_DIR/CLAUDE.md" ] \
+   && [ ! -L "$CODEX_HOME/AGENTS.md" ] \
+   && [ ! -L "$CLAUDE_CONFIG_DIR/skills/delegate" ] \
+   && [ ! -L "$CLAUDE_CONFIG_DIR/skills/compound-learning" ] \
+   && [ -f "$CLAUDE_CONFIG_DIR/projects/.git" ] \
+   && [ "$(git -C "$CLAUDE_CONFIG_DIR/projects" config --bool brain.enabled)" = false ]; then
+  ok 'removal: documented commands remove logical clone links and preserve the disabled brain'
+else
+  no 'removal: documented commands remove logical clone links and preserve the disabled brain'
+  cat -- "$tmp/removal-output"
+fi
 
 exit "$fail"

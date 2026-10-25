@@ -2,10 +2,11 @@
 
 Read `docs/internals.md` before changing anything.
 
-This repository tracks only what was authored here: the `delegate` skill,
-global instructions and curated settings. Never track logins, memory, caches
-or tool-written configuration. `./setup.sh` links and merges the harness into
-the installed tools; `./setup.sh --dry-run` previews those changes.
+This repository tracks only what was authored here: the `delegate` and
+`compound-learning` skills, brain scripts, global instructions and curated
+settings. Never track logins, memory, caches or tool-written configuration.
+`./setup.sh` links and merges the harness into the installed tools;
+`./setup.sh --dry-run` previews those changes.
 
 - `claude/`: Claude Code global instructions, skills, hooks and settings.
 - `codex/`: Codex global instructions and curated configuration.

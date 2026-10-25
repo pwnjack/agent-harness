@@ -17,6 +17,25 @@ printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "
 printf '#!/usr/bin/env bash\nexit "${SSH_ADD_RESULT:-0}"\n' > "$tmp/bin/ssh-add" || exit 1
 chmod +x -- "$tmp"/bin/* || exit 1
 export PATH="$tmp/bin:$PATH"
+real_git=$(command -v git)
+export TEST_REAL_GIT="$real_git"
+cat > "$tmp/bin/git" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = update-ref ] && [ "${TEST_MOVE_BRANCH:-0}" = 1 ]; then
+  # Publish a competing commit immediately before the guarded update.
+  tree=$("$TEST_REAL_GIT" rev-parse "$4^{tree}") || exit 1
+  other=$("$TEST_REAL_GIT" commit-tree "$tree" -p "$4" -m 'concurrent commit') || exit 1
+  "$TEST_REAL_GIT" update-ref "$2" "$other" "$4" || exit 1
+fi
+if [ "$1" = read-tree ] && [ -z "${GIT_INDEX_FILE:-}" ] \
+   && [ "${TEST_FAIL_INDEX_SYNC:-0}" = 1 ]; then
+  echo 'fixture: shared index locked' >&2
+  exit 1
+fi
+exec "$TEST_REAL_GIT" "$@"
+SH
+chmod +x -- "$tmp/bin/git" || exit 1
 fail=0
 number=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -27,6 +46,7 @@ fixture() {
   export HOME="$case_dir/home" CLAUDE_CONFIG_DIR="$case_dir/claude" CODEX_HOME="$case_dir/codex"
   export XDG_STATE_HOME="$case_dir/state" XDG_CONFIG_HOME="$case_dir/config"
   export SSH_ADD_RESULT=0
+  export TEST_MOVE_BRANCH=0 TEST_FAIL_INDEX_SYNC=0
   projects="$case_dir/projects"
   remote="$case_dir/remote.git"
   memory="$projects/-home-u-proj/memory"
@@ -100,6 +120,20 @@ if [ "$result" -eq 0 ] && [ -n "$(head_oid)" ] && [ "$(head_oid)" = "$(remote_oi
    && [ "$(git -C "$projects" rev-parse --abbrev-ref '@{u}' 2>/dev/null)" = origin/main ]; then
   ok 'first push: empty remote receives main and upstream is set'
 else no 'first push: empty remote receives main and upstream is set'; fi
+if [ "$result" -eq 0 ] \
+   && [ "$(git -C "$projects" write-tree)" = "$(git -C "$projects" rev-parse 'HEAD^{tree}')" ] \
+   && [ -z "$(git -C "$projects" status --porcelain)" ]; then
+  ok 'first commit: shared index matches HEAD and status is clean'
+else no 'first commit: shared index matches HEAD and status is clean'; fi
+
+fixture
+ln -s -- "$projects" "$case_dir/projects-link"
+projects="$case_dir/projects-link"
+run
+if [ "$result" -eq 0 ] && tracked -home-u-proj/memory/note.md \
+   && [ "$(head_oid)" = "$(remote_oid)" ]; then
+  ok 'symlinked projects path: commits and pushes memory'
+else no 'symlinked projects path: commits and pushes memory'; fi
 
 fixture
 mkdir -p -- "$memory/nested/deeper" "$memory/.hidden" "$projects/-tmp-case/memory"
@@ -118,12 +152,66 @@ else no 'whitelist: nested markdown only; transcripts, locks, dotfiles, tmp proj
 fixture
 printf 'Transcript.\n' > "$projects/-home-u-proj/transcript.jsonl"
 git -C "$projects" add -f -- -home-u-proj/transcript.jsonl
-index_before=$(git -C "$projects" write-tree)
 run
 if [ "$result" -eq 0 ] && tracked -home-u-proj/memory/note.md && ! tracked -home-u-proj/transcript.jsonl \
-   && [ "$(git -C "$projects" write-tree)" = "$index_before" ]; then
-  ok 'pre-staged transcript: excluded and shared index preserved'
-else no 'pre-staged transcript: excluded and shared index preserved'; fi
+   && [ "$(git -C "$projects" write-tree)" = "$(git -C "$projects" rev-parse 'HEAD^{tree}')" ] \
+   && [ -z "$(git -C "$projects" status --porcelain)" ] \
+   && [ "$(cat -- "$projects/-home-u-proj/transcript.jsonl")" = Transcript. ]; then
+  ok 'pre-staged transcript: never committed, left on disk, shared index matches HEAD'
+else no 'pre-staged transcript: never committed, left on disk, shared index matches HEAD'; fi
+
+for path in '-home-u-proj/transcript.jsonl' '-home-u-proj/memory/notes.txt' \
+  '-home-u-proj/memory/.hidden.md' '-home-u-proj/memory/.hidden/note.md' \
+  '.hidden/memory/note.md' \
+  '-home-u-proj/other/memory/note.md'; do
+  fixture
+  # A nested ignore file can override the top-level whitelist, but must not
+  # override the commit script's independent path validation.
+  mkdir -p -- "$(dirname -- "$projects/$path")"
+  printf '!*/\n!*.jsonl\n!*.txt\n!*.md\n' > "$projects/${path%%/*}/.gitignore"
+  printf 'Must stay private.\n' > "$projects/$path"
+  run
+  if [ "$result" -eq 1 ] && ! head_oid >/dev/null && [ -z "$(remote_oid)" ] \
+     && grep -Fq -- "refusing non-whitelisted file $path" "$case_dir/stderr"; then
+    ok "nested ignore override: refuses $path"
+  else no "nested ignore override: refuses $path"; fi
+done
+
+fixture
+run
+before=$(head_oid)
+printf 'Updated memory.\n' >> "$memory/note.md"
+printf 'stale lock\n' > "$XDG_STATE_HOME/agent-brain.git/refs/heads/main.lock"
+run
+if [ "$result" -eq 1 ] && [ "$(head_oid)" = "$before" ] \
+   && grep -Fq -- 'main.lock' "$case_dir/stderr" \
+   && grep -Fq -- 'File exists' "$case_dir/stderr" \
+   && ! grep -Fq -- 'branch moved' "$case_dir/stderr"; then
+  ok 'stale main.lock: exit 1 with git stderr and unchanged HEAD'
+else no 'stale main.lock: exit 1 with git stderr and unchanged HEAD'; fi
+
+fixture
+run
+before=$(head_oid)
+printf 'Updated memory.\n' >> "$memory/note.md"
+export TEST_MOVE_BRANCH=1
+run
+if [ "$result" -eq 0 ] && [ "$(head_oid)" != "$before" ] \
+   && [ "$(git -C "$projects" log -1 --format=%s)" = 'concurrent commit' ] \
+   && [ "$(remote_oid)" = "$before" ] \
+   && grep -Fq -- 'branch moved during run' "$case_dir/stderr"; then
+  ok 'concurrent branch update: exit 0 and defer retry without overwriting it'
+else no 'concurrent branch update: exit 0 and defer retry without overwriting it'; fi
+
+fixture
+export TEST_FAIL_INDEX_SYNC=1
+run
+if [ "$result" -eq 0 ] && tracked -home-u-proj/memory/note.md \
+   && [ "$(head_oid)" = "$(remote_oid)" ] \
+   && grep -Fq -- 'fixture: shared index locked' "$case_dir/stderr" \
+   && grep -Fq -- 'could not synchronise shared index' "$case_dir/stderr"; then
+  ok 'shared index sync failure: logged without undoing the commit or push'
+else no 'shared index sync failure: logged without undoing the commit or push'; fi
 
 fixture
 printf 'Transcript.\n' > "$projects/-home-u-proj/transcript.jsonl"
@@ -223,9 +311,10 @@ fixture
 mv -- "$remote" "$case_dir/saved.git"
 run
 before=$(head_oid)
-if [ "$result" -eq 1 ] && [ "$(count)" = 1 ] && grep -q '^brain: push failed' "$case_dir/stderr"; then
-  ok 'unreachable remote with key: commit made, exit 1'
-else no 'unreachable remote with key: commit made, exit 1'; fi
+if [ "$result" -eq 1 ] && [ "$(count)" = 1 ] && grep -q '^brain: push failed' "$case_dir/stderr" \
+   && grep -Fq -- 'does not appear to be a git repository' "$case_dir/stderr"; then
+  ok 'unreachable remote with key: commit made, exit 1, git push error logged'
+else no 'unreachable remote with key: commit made, exit 1, git push error logged'; fi
 mv -- "$case_dir/saved.git" "$remote"
 run
 if [ "$result" -eq 0 ] && [ -n "$before" ] && [ "$(head_oid)" = "$before" ] && [ "$(remote_oid)" = "$before" ]; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Commit a scanned memory tree without changing the shared index, then push.
+# Commit a scanned memory tree, synchronise the shared index, then push.
 set -euo pipefail
 export LC_ALL=C
 
@@ -8,7 +8,7 @@ refuse() { log "$*"; exit 1; }
 if [ "$#" -ne 1 ]; then refuse 'usage: commit.sh <projects-dir>'; fi
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 [ -d "$1" ] || exit 0
-projects=$(cd -- "$1" && pwd)
+projects=$(cd -- "$1" && pwd -P)
 cd -- "$projects"
 # Do not discover a parent repository when the projects directory has no repo.
 [ "$(git rev-parse --show-toplevel 2>/dev/null || true)" = "$projects" ] || exit 0
@@ -32,6 +32,21 @@ if [ -s "$tmp/ignored" ]; then
   exit 1
 fi
 git add -A -- .
+# Ignore files are user-controlled, so validate every candidate independently.
+git ls-files -z > "$tmp/candidates"
+invalid=false
+while IFS= read -r -d '' file; do
+  case "$file" in
+    .gitignore) continue ;;
+    .*|-tmp*|*/.*) ;;
+    */*)
+      case "${file#*/}" in memory/*.md) continue ;; esac
+      ;;
+  esac
+  printf 'brain: refusing non-whitelisted file %q\n' "$file" >&2
+  invalid=true
+done < "$tmp/candidates"
+if "$invalid"; then exit 1; fi
 
 secret=false
 while IFS=$'\t' read -r name re; do
@@ -58,9 +73,21 @@ if [ "$tree" != "$old_tree" ]; then
   parents=()
   if [ -n "$old" ]; then parents=(-p "$old"); fi
   new=$(git -c commit.gpgsign=false commit-tree "$tree" ${parents[@]+"${parents[@]}"} -m "memory: $keys")
-  if ! git update-ref refs/heads/main "$new" "$old" 2>/dev/null; then
-    log 'branch moved during run; next run will retry'
-    exit 0
+  if ! git update-ref refs/heads/main "$new" "$old" 2> "$tmp/update-ref"; then
+    current=$(git rev-parse -q --verify refs/heads/main || true)
+    if [ "$current" != "$old" ]; then
+      log 'branch moved during run; next run will retry'
+      exit 0
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do log "$line"; done < "$tmp/update-ref"
+    refuse 'could not update main'
+  fi
+  # Keep status and later manual commits consistent with the published tree.
+  # Unrelated staging is discarded; files in the worktree are left untouched.
+  unset GIT_INDEX_FILE
+  if ! git read-tree "$new" 2> "$tmp/index-sync"; then
+    while IFS= read -r line || [ -n "$line" ]; do log "$line"; done < "$tmp/index-sync"
+    log 'could not synchronise shared index; commit retained'
   fi
   "$here/audit.sh" "$projects" > "$tmp/audit" 2>&1 || true
   while IFS= read -r line || [ -n "$line" ]; do log "$line"; done < "$tmp/audit"
@@ -84,5 +111,7 @@ else
 fi
 export GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes'
 if ! timeout 60 git push -u origin HEAD:main > "$tmp/push" 2>&1; then
+  tail -n 10 -- "$tmp/push" > "$tmp/push-tail"
+  while IFS= read -r line || [ -n "$line" ]; do log "$line"; done < "$tmp/push-tail"
   refuse 'push failed; next run will retry'
 fi
