@@ -28,9 +28,9 @@
 # The pane stays open on BLOCKED, NOREPORT, NOSTART and TIMEOUT: read it,
 # answer or re-prompt with `herdr agent prompt`, then run --wait, and close it
 # with `herdr pane close` when done with it. DELEGATE_KEEP=1 keeps it open on
-# REPORT too, for a fix round that resumes it; QUOTA still closes it. --wait and
-# --resume keep it by default (the caller already owns that pane);
-# DELEGATE_KEEP=0 closes it on REPORT. A start blocked by a first-run
+# REPORT too, for a fix round that resumes it; QUOTA still closes it. --wait
+# keeps it by default (DELEGATE_KEEP=0 closes it on REPORT); --resume always
+# keeps it. A start blocked by a first-run
 # folder-trust prompt is BLOCKED with the pane kept: answer it there, then
 # close the pane and rerun, because the brief was never sent.
 # A report that breaks the contract (a missing or extra key, concerns as one
