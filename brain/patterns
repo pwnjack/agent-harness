@@ -1,0 +1,9 @@
+openai	sk-[A-Za-z0-9_-]{20,}
+anthropic	sk-ant-[A-Za-z0-9_-]{20,}
+github	gh[po]_[A-Za-z0-9]{30,}
+github-pat	github_pat_[A-Za-z0-9_]{30,}
+google	AIza[0-9A-Za-z_-]{35}
+aws	AKIA[0-9A-Z]{16}
+slack	xox[bap]-[A-Za-z0-9-]{10,}
+private-key	-----BEGIN [A-Z ]*PRIVATE KEY-----
+assignment	[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*["']?[A-Za-z0-9_/+.=-]{16,}
