@@ -6,7 +6,7 @@
 # to them, so a fresh install stays fresh. Every step is optional: a missing
 # claude, codex or herdr is skipped, never an error. Idempotent.
 #
-#   scripts/agents/setup.sh [--dry-run]
+#   ./setup.sh [--dry-run]
 #
 # Links: claude/skills/*/ -> ~/.claude/skills/, claude/CLAUDE.global.md ->
 # ~/.claude/CLAUDE.md,
@@ -18,7 +18,7 @@
 # deleted.
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dry=false
 [ "${1:-}" = --dry-run ] && dry=true
 claude_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}

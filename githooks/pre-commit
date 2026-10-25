@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Test the staged tree in a private snapshot, including partially staged files.
+set -euo pipefail
+
+repo="$(git rev-parse --show-toplevel)"
+snapshot=$(mktemp -d)
+trap 'rm -rf -- "$snapshot"' EXIT
+if ! bash -- "$repo/githooks/snapshot.sh" "$repo" "$snapshot"; then
+  echo 'pre-commit: could not export staged files; no tests were run' >&2
+  exit 1
+fi
+
+# A hook can inherit routes to the real index, worktree and object database.
+while IFS= read -r name; do
+  unset "$name"
+done < <(git rev-parse --local-env-vars)
+cd "$snapshot/worktree"
+bash -- ./test.sh

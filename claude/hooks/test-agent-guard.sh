@@ -4,9 +4,13 @@
 # when apply-settings.sh runs twice. Never touches the real ~/.claude.
 #   bash claude/hooks/test-agent-guard.sh
 set -uo pipefail
-here=$(dirname "$(readlink -f "$0")")
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
+export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
+mkdir -p -- "$HOME/.config/claude/hooks" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
+ln -s -- "$here/agent-guard.sh" "$HOME/.config/claude/hooks/agent-guard.sh"
 fail=0
 ok() { echo "ok   $1"; }
 no() { echo "FAIL $1"; fail=1; }
