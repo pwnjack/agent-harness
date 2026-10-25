@@ -1,0 +1,6 @@
+[Unit]
+Description=Commit and push Claude memory
+
+[Service]
+Type=oneshot
+ExecStart=@COMMAND@ @PROJECTS@

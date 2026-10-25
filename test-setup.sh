@@ -8,12 +8,39 @@ trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/home/.claude" CODEX_HOME="$tmp/home/.codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
 mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR/skills" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin"
-for command in claude codex systemctl uname gh ssh-add; do
+for command in claude codex ssh-add; do
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command"
 done
+cat > "$tmp/bin/uname" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${TEST_UNAME:-Linux}"
+SH
+cat > "$tmp/bin/gh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${TEST_VISIBILITY:-PRIVATE}"
+SH
+cat > "$tmp/bin/systemctl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$TEST_SYSTEMCTL_LOG"
+SH
+export TEST_SYSTEMCTL_LOG="$tmp/systemctl.log"
+: > "$TEST_SYSTEMCTL_LOG"
 printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "$tmp/bin/herdr"
 chmod +x -- "$tmp"/bin/*
 export PATH="$tmp/bin:$PATH"
+
+# Setup configures the clone's hooks, so exercise a disposable clone too.
+source_repo=$repo
+prepare_clone() {
+  repo=$1
+  mkdir -p -- "$repo" || return 1
+  cp -- "$source_repo/setup.sh" "$repo/setup.sh" || return 1
+  for directory in claude codex brain githooks; do
+    cp -R -- "$source_repo/$directory" "$repo/$directory" || return 1
+  done
+  git init -q -b main -- "$repo"
+}
+prepare_clone "$tmp/clone" || exit 1
 
 fail=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -102,5 +129,169 @@ for backup in "$XDG_STATE_HOME"/dotfiles-agents-backup/*/.claude/harness*; do
 done
 if "$saved"; then ok 'custom config: existing harness file backed up'
 else no 'custom config: existing harness file backed up'; fi
+
+if [ "$(git -C "$repo" config --local core.hooksPath)" = githooks ]; then
+  ok 'plain setup: harness hooks configured'
+else no 'plain setup: harness hooks configured'; fi
+if [ ! -e "$CLAUDE_CONFIG_DIR/projects/.git" ] \
+   && [ ! -e "$XDG_CONFIG_HOME/systemd/user/brain-commit.service" ] \
+   && [ ! -e "$XDG_STATE_HOME/agent-brain.git" ] \
+   && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && jq -e 'has("autoDreamEnabled") | not' "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'plain setup: no brain repository, units, timer or auto-dream'
+else no 'plain setup: no brain repository, units, timer or auto-dream'; fi
+
+brain_home() {
+  export HOME="$tmp/brain-$1" CLAUDE_CONFIG_DIR="$tmp/brain-$1/config"
+  export CODEX_HOME="$tmp/brain-$1/codex" XDG_STATE_HOME="$tmp/brain-$1/state"
+  export XDG_CONFIG_HOME="$tmp/brain-$1/xdg-config"
+  : > "$TEST_SYSTEMCTL_LOG"
+}
+refused() {
+  if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+    no "$1"
+  elif [ ! -e "$HOME" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ]; then
+    ok "$1"
+  else no "$1"; fi
+}
+brain_home darwin
+TEST_UNAME=Darwin refused 'brain: Darwin refused without creating anything'
+brain_home public
+TEST_VISIBILITY=PUBLIC refused 'brain: public remote refused without creating anything'
+brain_home missing-gh
+# A minimal PATH ensures an installed gh cannot hide this missing dependency.
+mkdir -p -- "$tmp/no-gh"
+for command in date dirname jq uname; do
+  ln -s -- "$(command -v "$command")" "$tmp/no-gh/$command"
+done
+bash_path=$(command -v bash)
+ln -s -- "$bash_path" "$tmp/no-gh/bash"
+if PATH="$tmp/no-gh" "$bash_path" "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: missing gh refused without creating anything'
+elif [ ! -e "$HOME" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && grep -qF -- '--brain requires gh' "$tmp/output"; then
+  ok 'brain: missing gh refused without creating anything'
+else no 'brain: missing gh refused without creating anything'; fi
+
+brain_home directory
+mkdir -p -- "$CLAUDE_CONFIG_DIR/projects"
+git init -q -b main -- "$CLAUDE_CONFIG_DIR/projects"
+printf 'untouched\n' > "$CLAUDE_CONFIG_DIR/projects/.git/sentinel"
+cp -- "$CLAUDE_CONFIG_DIR/projects/.git/config" "$tmp/original-config"
+if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: existing .git directory refused unchanged'
+elif cmp -s -- "$tmp/original-config" "$CLAUDE_CONFIG_DIR/projects/.git/config" \
+   && [ "$(cat -- "$CLAUDE_CONFIG_DIR/projects/.git/sentinel")" = untouched ] \
+   && [ ! -e "$HOME/.claude" ] && [ ! -e "$XDG_STATE_HOME" ]; then
+  ok 'brain: existing .git directory refused unchanged'
+else no 'brain: existing .git directory refused unchanged'; fi
+brain_home foreign
+mkdir -p -- "$CLAUDE_CONFIG_DIR/projects"
+printf 'gitdir: /some/other/repository.git\n' > "$CLAUDE_CONFIG_DIR/projects/.git"
+cp -- "$CLAUDE_CONFIG_DIR/projects/.git" "$tmp/original-gitfile"
+if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: foreign gitfile refused unchanged'
+elif cmp -s -- "$tmp/original-gitfile" "$CLAUDE_CONFIG_DIR/projects/.git" \
+   && [ ! -e "$HOME/.claude" ] && [ ! -e "$XDG_STATE_HOME" ]; then
+  ok 'brain: foreign gitfile refused unchanged'
+else no 'brain: foreign gitfile refused unchanged'; fi
+
+brain_home custom
+# Preserve the same live keys and external hook as the upgrade fixture.
+mkdir -p -- "$CLAUDE_CONFIG_DIR"
+cp -- "$tmp/once.json" "$CLAUDE_CONFIG_DIR/settings.json"
+setup --brain
+projects="$CLAUDE_CONFIG_DIR/projects"
+service="$XDG_CONFIG_HOME/systemd/user/brain-commit.service"
+timer="$XDG_CONFIG_HOME/systemd/user/brain-commit.timer"
+if [ -f "$projects/.git" ] \
+   && [ "$(cat -- "$projects/.git")" = "gitdir: $XDG_STATE_HOME/agent-brain.git" ] \
+   && [ "$(git -C "$projects" symbolic-ref --short HEAD 2>/dev/null)" = main ] \
+   && [ "$(git -C "$projects" remote get-url origin 2>/dev/null)" = git@github.com:pwnjack/agent-brain.git ] \
+   && [ "$(git -C "$projects" config --bool brain.enabled)" = true ] \
+   && [ "$(git -C "$projects" config brain.remote)" = git@github.com:pwnjack/agent-brain.git ] \
+   && [ "$(git -C "$projects" ls-tree --name-only HEAD 2>/dev/null)" = .gitignore ] \
+   && [ "$(git -C "$projects" log -1 --format='%an <%ae> %cn <%ce> %s' 2>/dev/null)" = 'brain <brain@localhost> brain <brain@localhost> brain: start' ] \
+   && cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore" \
+   && git -C "$projects" show HEAD:.gitignore > "$tmp/committed-ignore" \
+   && cmp -s -- "$repo/brain/gitignore" "$tmp/committed-ignore"; then
+  ok 'brain: separate git dir, main, remote, opt-in config and exact committed whitelist'
+else no 'brain: separate git dir, main, remote, opt-in config and exact committed whitelist'; fi
+if jq -e '.autoDreamEnabled == true and .keepMe == 1
+  and any(.hooks.SessionStart[].hooks[]; .command == "bash '\''/x/herdr-agent-state.sh'\'' session")' \
+  "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null \
+  && jq -e 'has("autoDreamEnabled") | not' "$repo/claude/settings.json" >/dev/null; then
+  ok 'brain: auto-dream enabled only in live settings; keepMe and herdr hook preserved'
+else no 'brain: auto-dream enabled only in live settings; keepMe and herdr hook preserved'; fi
+if [ -f "$service" ] && [ -f "$timer" ]; then
+  first=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^(?<arg>\\\"([^\\\"\\\\]|\\\\.)*\\\") ").arg | fromjson')
+  second=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^\\\"([^\\\"\\\\]|\\\\.)*\\\" (?<arg>.*)$").arg | fromjson')
+  if [ "$first" = "$repo/brain/commit.sh" ] && [ -x "$first" ] \
+     && [ "$second" = "$projects" ] && grep -qxF -- Type=oneshot "$service"; then
+    ok 'brain: unit arguments name executable and custom config projects path'
+  else no 'brain: unit arguments name executable and custom config projects path'; fi
+  if grep -qxF -- OnStartupSec=2min "$timer" \
+     && grep -qxF -- OnUnitActiveSec=30min "$timer" \
+     && grep -qxF -- WantedBy=timers.target "$timer" \
+     && [ "$(cat -- "$TEST_SYSTEMCTL_LOG")" = "--user daemon-reload
+--user enable --now brain-commit.timer" ]; then
+    ok 'brain: timer schedule installed and enabled through user systemctl'
+  else no 'brain: timer schedule installed and enabled through user systemctl'; fi
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    if systemd-analyze --user verify "$service" "$timer" > "$tmp/verify" 2>&1; then
+      ok 'brain: rendered units pass systemd-analyze --user verify'
+    else no 'brain: rendered units pass systemd-analyze --user verify'; cat -- "$tmp/verify"; fi
+  else ok 'skip: systemd-analyze unavailable'; fi
+  cp -- "$service" "$tmp/service-once"
+  cp -- "$timer" "$tmp/timer-once"
+  cp -- "$projects/.git" "$tmp/gitfile-once"
+  cp -- "$XDG_STATE_HOME/agent-brain.git/config" "$tmp/config-once"
+  cp -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/brain-settings-once"
+  head_once=$(git -C "$projects" rev-parse HEAD)
+  setup --brain
+  if [ "$(git -C "$projects" rev-parse HEAD)" = "$head_once" ] \
+     && cmp -s -- "$service" "$tmp/service-once" \
+     && cmp -s -- "$timer" "$tmp/timer-once" \
+     && cmp -s -- "$projects/.git" "$tmp/gitfile-once" \
+     && cmp -s -- "$XDG_STATE_HOME/agent-brain.git/config" "$tmp/config-once" \
+     && cmp -s -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/brain-settings-once"; then
+    ok 'brain: second run leaves commit, gitfile, config, units and settings identical'
+  else no 'brain: second run leaves commit, gitfile, config, units and settings identical'; fi
+else
+  no 'brain: service and timer installed'
+fi
+
+# systemd rejects quote characters in executable names, even correctly escaped.
+# Check quoting separately from verification of the normal installation above.
+prepare_clone "$tmp/clone with a \"quote and a \\slash" || exit 1
+brain_home quoted
+setup --brain
+service="$XDG_CONFIG_HOME/systemd/user/brain-commit.service"
+if [ -f "$service" ]; then
+  first=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^(?<arg>\\\"([^\\\"\\\\]|\\\\.)*\\\") ").arg | fromjson')
+  if [ "$first" = "$repo/brain/commit.sh" ] && [ -x "$first" ]; then
+    ok 'brain: quoted and backslashed clone path dequotes to an existing executable'
+  else no 'brain: quoted and backslashed clone path dequotes to an existing executable'; fi
+else no 'brain: unit installed for quoted clone path'; fi
+
+brain_home dry-run
+setup --brain --dry-run
+if [ ! -e "$HOME" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ]; then
+  ok 'brain: dry run creates no repository, config, units or timer'
+else no 'brain: dry run creates no repository, config, units or timer'; fi
+
+# The timer must not inherit a relative config path from the setup process.
+brain_home relative
+mkdir -p -- "$HOME"
+(
+  cd -- "$HOME" || exit 1
+  export CLAUDE_CONFIG_DIR='relative config'
+  setup --brain || exit 1
+  service="$XDG_CONFIG_HOME/systemd/user/brain-commit.service"
+  second=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^\\\"([^\\\"\\\\]|\\\\.)*\\\" (?<arg>.*)$").arg | fromjson')
+  [ "$second" = "$HOME/relative config/projects" ]
+)
+if [ "$?" -eq 0 ]; then ok 'brain: relative config resolved to an absolute projects argument'
+else no 'brain: relative config resolved to an absolute projects argument'; fi
 
 exit "$fail"
