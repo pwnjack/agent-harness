@@ -56,7 +56,7 @@ usage() { echo "usage: $0 claude|codex <alias> <effort> <role> <task> <brief> | 
 # A report path no other round can share: an old path returns its old report.
 newreport() { local f; f=$(mktemp "$dir/$1-XXXXXXXX.json") && rm -f "$f" && echo "$f"; }
 # The report request every prompt ends with; the report path is always new.
-ask() { echo "Finally, even if you failed, write your report to $report as JSON with exactly these keys: status (complete|partial|failed), summary, files_changed, commands_run, tests_run, blockers, concerns."; }
+ask() { echo "Finally, even if you failed, write your report to $report as JSON with exactly these keys: status (complete|partial|failed), summary (a string), and files_changed, commands_run, tests_run, blockers, concerns (each an array of strings)."; }
 # Judges one snapshot of the report (the worker may still be writing it):
 # prints what breaks the contract, nothing when it holds, and fails while the
 # snapshot is not yet complete JSON.
