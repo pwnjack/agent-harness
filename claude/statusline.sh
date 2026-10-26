@@ -35,12 +35,13 @@ YEL=$'\033[38;5;179m'   # muted gold
 ORG=$'\033[38;5;173m'   # soft amber
 RED=$'\033[38;5;167m'   # soft rose-red
 BLU=$'\033[38;5;110m'   # soft steel blue: context's base, apart from the usage bars
+MAG=$'\033[38;5;140m'   # muted purple
 # rate-limit color: green < 50, yellow >= 50, orange >= 80, red >= 90
 hue() { awk -v p="$1" -v g="$GRN" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(p>=90)print r;else if(p>=80)print o;else if(p>=50)print y;else print g}'; }
 # context color: blue < 50, yellow >= 50, orange >= 70, red >= 85
 hue_ctx() { awk -v p="$1" -v g="$BLU" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(p>=85)print r;else if(p>=70)print o;else if(p>=50)print y;else print g}'; }
-# reasoning-effort color: green = low, yellow = medium, red = high/xhigh/max
-hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high|xhigh|max) echo "$RED";; *) echo "$DIM";; esac; }
+# reasoning-effort color: green = low, yellow = medium, orange = high, red = xhigh, purple = max
+hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high) echo "$ORG";; xhigh) echo "$RED";; max) echo "$MAG";; *) echo "$DIM";; esac; }
 
 # FiraCode's own progress bar (U+EE00-EE05): an outlined, round-ended bar
 # whose cells fill from the left. Empty left/middle/right, then filled
