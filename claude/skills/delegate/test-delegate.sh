@@ -271,7 +271,7 @@ for k in status summary files_changed commands_run tests_run blockers concerns; 
 done
 if [ -z "$missing" ] && grep -q "write your report to $tmp/handoff/impl-t-claude-" "$tmp/state-claude/msg"
 then echo "ok   pane prompt: names the report path and every key"; else echo "FAIL pane prompt: missing$missing"; fail=1; fi
-if grep -q "each an array of strings" "$tmp/state-claude/msg"
+if grep -q "summary (a string), and files_changed, commands_run, tests_run, blockers, concerns (each an array of strings)" "$tmp/state-claude/msg"
 then echo "ok   pane prompt: says the list keys are arrays of strings"; else echo "FAIL pane prompt: list key types not stated"; fail=1; fi
 # The pane is named <role>-<model>-<task>: the alias, or "codex" when
 # config.toml's model runs (inherit, or an alias that degraded onto it).

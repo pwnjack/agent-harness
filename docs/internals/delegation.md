@@ -28,9 +28,9 @@
   the Agent-tool fallback. Codex's `AGENTS.md` makes it a leaf whenever a
   report path or the marker is present. A leaf never starts agents, so live
   checks that need a Claude or Codex session belong to the orchestrator.
-- **Report contract.** `pane.sh` names the report path, its JSON keys and
-  their types (the list keys are arrays of strings) in the prompt, for Claude
-  and Codex alike. A malformed report is `NOREPORT`
+- **Report contract.** `pane.sh` names the report path and its JSON keys in
+  the prompt, for Claude and Codex alike, and asks for the list keys as arrays
+  of strings; the check accepts any array. A malformed report is `NOREPORT`
   and is moved aside for a fresh one.
 - **Model names.** Skills name aliases (`sonnet`) and Codex codenames (`sol`),
   never pinned IDs; `test-skills.sh` enforces this. `codex-model.sh` resolves
