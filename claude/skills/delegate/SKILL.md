@@ -7,20 +7,25 @@ description: Hand implementation, review or exploration to another model (Claude
 
 ## Choosing the worker: family, model, effort
 
-Choose model and effort together. Pick the model by the hardest part of the
-task, then select its effort from the table:
+Pick the model by the hardest part of the task:
 
-| Work (implementing or reviewing) | Claude | Codex |
+| Work (implementing, reviewing or exploring) | Claude | Codex |
 |---|---|---|
-| Mechanical edits, read-only search | `haiku` · `medium` | `luna` · `medium` |
-| Small, fully specified change | `haiku` · `high` | `luna` · `high` |
-| Standard implementation; routine review | `sonnet` · `medium` | `sol` · `medium` |
-| Tricky logic; substantial review | `sonnet` · `high` | `sol` · `high` |
-| Subtle, security-bearing, cross-cutting, this harness | `opus` · `high` (`xhigh` if needed) | `sol` · `xhigh` |
+| Mechanical edits, read-only search, small fully specified change | `haiku` | `luna` |
+| Standard implementation, tricky logic, routine or substantial review | `sonnet` | `sol` |
+| Subtle, security-bearing, cross-cutting, this harness | `opus` | `sol` |
 
-- Never use `low` effort for delegated work.
-- Raise effort while the task is within the model's reach; move up a model
-  when it needs understanding the model lacks.
+Then choose the effort for this task, whatever the role, from `low`,
+`medium`, `high` and `xhigh`:
+
+- `low`: a narrow, well-specified lookup or edit where a missed case is cheap.
+- `medium`: routine implementation and ordinary exploration.
+- `high`: review, verification, edge-case-heavy work in existing code.
+- `xhigh`: hard bugs and design-level work.
+
+These are starting points: go up when a missed case would be costly, down
+when it would be cheap. Effort cuts missed cases, not wrong calls; when the
+task needs understanding the model lacks, move up a model instead.
 - Use Codex when the spec is self-contained. Use Claude when the work needs
   this conversation's context or judgement about the repo's conventions.
 - Do trivial work (a line, a rename, a config tweak) and ambiguous or
@@ -33,7 +38,7 @@ task, then select its effort from the table:
 ## Review
 
 Before reporting a non-trivial change done, get one review from the other
-family, with the row chosen from the table by the diff: Claude's work (yours
+family, its model and effort chosen as above for the diff: Claude's work (yours
 included) goes to Codex, Codex's to Claude. With no usable Codex, a different
 Claude model reviews (`opus` for Sonnet's work, `sonnet` for yours or Opus's);
 say the review was same-family.
@@ -93,9 +98,9 @@ and exits with one verdict line (meanings in the script header):
 - `NOSTART`, `GONE`, `TIMEOUT`: read the printed screen and report; do not
   silently retry.
 - `NOHERDR`: not in a Herdr session (never returned inside one). Claude
-  workers fall back to the Agent tool (`model`
-  set to the alias, `run_in_background: true`); Codex is unavailable, so say so
-  once and take the Claude route.
+  workers fall back to the Agent tool with the same choice and brief (`model`
+  set to the alias, `effort` to the chosen effort, `run_in_background: true`);
+  Codex is unavailable, so say so once and take the Claude route.
 
 Close any pane the script left open with `herdr pane close <pane>` once you are
 done with it. Report the model and effort from the verdict line.
@@ -109,8 +114,8 @@ Read the diff and re-run the verification commands yourself: a worker's
 
 Its skills name the Agent tool; "dispatch a subagent" is a role, and inside
 Herdr each one runs through `pane.sh` (a hook refuses the Agent tool there).
-Its tiers map onto the table: cheap is the first two rows, standard the middle
-two, most capable the last.
+Its tiers map onto the model table: cheap, standard and most capable are its
+three rows; effort is chosen per task as above.
 
 - **Which executor.** Use subagent-driven development for plans with several
   substantial tasks. A small plan runs inline (`executing-plans`) with the one
@@ -126,7 +131,7 @@ two, most capable the last.
   default), so the pane survives for fix rounds.
 - **Fix rounds.** 1-3: write the findings to a file, then
   `pane.sh --resume <pane> <file>` (a fresh report path, pane kept). 4-5: a
-  fresh pane one row higher. Close the pane when the task review passes.
+  fresh pane with a stronger model or a higher effort. Close the pane when the task review passes.
 - **Reviewers.** Task review and re-review: the other family from that task's
   implementer. Final review: the other family to the implementers, on the
   whole branch; this is the review above, reported once. Keep a plan's

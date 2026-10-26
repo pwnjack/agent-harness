@@ -35,10 +35,12 @@
   never pinned IDs; `test-skills.sh` enforces this. `codex-model.sh` resolves
   a codename to the newest listed model of that name at launch and clamps the
   effort to what the model lists.
-- **Model and effort are one decision.** The skill's table gives each kind of
-  work one model-and-effort pair per family; `low` is not used for delegated
-  work. Raise effort while a task is within a model's reach; past
-  that, move up a model.
+- **Model, then effort.** The skill's table picks the model per family by
+  the hardest part of the work. Effort is chosen per task for every role,
+  from starting points the skill lists; no level is fixed to a role. Past a
+  model's reach, move up a model rather than raise effort.
+- **Same choice in every runner.** The Agent-tool fallback outside Herdr
+  gets the same model, effort and brief as a pane.
 - **Opt-in models are an allow-list.** Only Claude `haiku`, `sonnet`, `opus`
   (`CLAUDE_STANDARD` in `pane.sh`) and Codex `luna`, `terra`, `sol`
   (`STANDARD` in `codex-model.sh`) run freely. Every other name, `fable`,
