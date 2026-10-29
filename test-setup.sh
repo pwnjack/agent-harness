@@ -131,8 +131,8 @@ else no 'dry run: neither file written'; fi
 setup
 if grep -qxF -- 'sidebar_width = 34' "$herdr_config" 2>/dev/null; then ok 'setup: herdr layout merged'
 else no 'setup: herdr layout merged'; fi
-if jq -e '[.hooks.SessionStart, .hooks.UserPromptSubmit, .hooks.PostToolUse, .hooks.Stop][]
-  | any(.[].hooks[]?; .command | contains("codex/hooks/sidebar.sh"))' \
+if jq -e '[.hooks.SessionStart, .hooks.UserPromptSubmit, .hooks.PostToolUse, .hooks.Stop]
+  | all(.[]?; any(.[].hooks[]?; .command | contains("codex/hooks/sidebar.sh")))' \
   "$CODEX_HOME/hooks.json" >/dev/null 2>&1; then
   ok 'setup: codex sidebar hooks added'
 else no 'setup: codex sidebar hooks added'; fi
