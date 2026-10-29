@@ -61,6 +61,13 @@ if merge && cmp -s -- "$tmp/expected.toml" "$tmp/target.toml" \
   ok "inline tables on fragment lines kept verbatim"
 else no "inline tables on fragment lines kept verbatim"; fi
 
+: > "$tmp/empty.toml"
+printf '[ui]\nrows = ["old"]\nwidth = 30\n' > "$tmp/target.toml"
+if bash "$here/toml-merge.sh" test "$tmp/target.toml" "$tmp/empty.toml" "$tmp/fragment.toml" > "$tmp/output" 2>&1 \
+   && cmp -s -- "$tmp/expected.toml" "$tmp/target.toml"; then
+  ok "empty fragment before a multi-line fragment"
+else no "empty fragment before a multi-line fragment"; fi
+
 printf '[ui]\nrows = []\n' > "$tmp/target.toml"
 chmod 600 -- "$tmp/target.toml"
 ln -- "$tmp/target.toml" "$tmp/link.toml"

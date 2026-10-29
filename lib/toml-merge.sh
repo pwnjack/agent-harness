@@ -23,7 +23,7 @@ tmp="$(mktemp "$target.XXXXXX")" \
   || { echo "$label: cannot write next to $target" >&2; exit 1; }
 trap 'rm -f "$tmp"' EXIT
 
-awk '
+TOML_TARGET=$target awk '
   function key(l) { sub(/^[ \t]+/, "", l); sub(/[ \t]*=.*/, "", l); return l }
   function flush(t,   i) {            # append fragment keys the table lacked
     for (i = 1; i <= n[t]; i++) if (!done[t, i]) { print line[t, i]; done[t, i] = 1 }
@@ -36,8 +36,8 @@ awk '
   }
   # a value with its trailing comment and all blanks removed, for comparison only
   function norm(s) { sub(/^[^=]*=/, "", s); sub(/[ \t]*#[^"\047]*$/, "", s); gsub(/[ \t]/, "", s); return s }
-  FNR == 1 { file++; tab = ""; open = 0 }
-  file <= nfrag {
+  FNR == 1 { tab = ""; open = 0 }
+  FILENAME != ENVIRON["TOML_TARGET"] {   # fragments; an empty one has no records
     if (open > 0) {                    # continuation of a multi-line fragment value
       line[tab, i] = line[tab, i] "\n" $0; multi[tab, i] = 1; open += delta($0)
     } else if ($0 ~ /^[ \t]*\[/) {
@@ -78,7 +78,7 @@ awk '
       print t; flush(t); target = 1
     }
   }
-' nfrag="${#fragments[@]}" "${fragments[@]}" "$target" > "$tmp"
+' "${fragments[@]}" "$target" > "$tmp"
 
 if cmp -s "$tmp" "$target"; then
   echo "$label: ${target##*/} already up to date"
