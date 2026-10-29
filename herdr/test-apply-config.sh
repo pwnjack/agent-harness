@@ -19,6 +19,7 @@ printf '%s\n' "\$line" >> '$tmp/calls'
 case \$line in
   config\|check)
     if [ "\${CHECK_RC:-0}" = 0 ]; then echo 'config: ok'; else echo 'config: issues found'; fi
+    [ -z "\${CHECK_RO:-}" ] || chmod 444 "\$HERDR_CONFIG_PATH"
     exit "\${CHECK_RC:-0}" ;;
   status\|server) exit "\${SERVER_RC:-0}" ;;
 esac
@@ -29,7 +30,7 @@ for tool in bash awk sed mktemp cp rm cat dirname basename mkdir cmp grep; do
   ln -s -- "$(command -v "$tool")" "$tmp/nobin/$tool"
 done
 export PATH="$tmp/bin:$PATH"
-unset HERDR_CONFIG_PATH CHECK_RC SERVER_RC HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE
+unset HERDR_CONFIG_PATH CHECK_RC CHECK_RO SERVER_RC HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE
 fail=0
 ok() { printf 'ok   %s\n' "$1"; }
 no() { printf 'FAIL %s\n' "$1"; fail=1; }
@@ -62,6 +63,43 @@ if [ "$rc" = 1 ] && cmp -s "$default" "$tmp/before" && grep -q "herdr: config ch
    && grep -q 'config: issues found' <<<"$out" && ! grep -q reload-config "$tmp/calls"; then ok 'failing check restores the original'
 else no 'failing check restores the original'; fi
 ls "$default".* >/dev/null 2>&1 && no 'backup removed after failure' || ok 'backup removed after failure'
+
+# A merger that dies mid-write must not cost the configuration: apply-config.sh
+# runs against a copy of the tree whose merger truncates the target and fails.
+fake="$tmp/fake"; mkdir -p -- "$fake/herdr" "$fake/lib"
+cp -- "$apply" "$fake/herdr/apply-config.sh"; cp -- "$here/sidebar.toml" "$fake/herdr/sidebar.toml"
+cat > "$fake/lib/toml-merge.sh" <<'EOS'
+#!/usr/bin/env bash
+printf 'partial' > "$2"
+[ -z "${MERGE_RO:-}" ] || chmod 444 "$2"
+exit 1
+EOS
+live; cp -- "$default" "$tmp/before"
+out=$(bash "$fake/herdr/apply-config.sh" 2>&1); rc=$?
+if [ "$rc" = 1 ] && cmp -s "$default" "$tmp/before" && grep -q "herdr: merge failed; restored $default" <<<"$out"; then
+  ok 'failed merge restores the original'
+else no 'failed merge restores the original'; echo "$out"; fi
+ls "$default".* >/dev/null 2>&1 && no 'backup removed after failed merge' || ok 'backup removed after failed merge'
+
+# Restoration itself failing (target read-only): keep the backup and report it.
+check_kept() { # check_kept <label> <apply script> <env assignment>...
+  live; cp -- "$default" "$tmp/before"
+  local label=$1 script=$2 out rc kept
+  shift 2
+  out=$(env "$@" bash "$script" 2>&1); rc=$?
+  kept=$(ls "$default".* 2>/dev/null | head -n 1)
+  if [ "$rc" = 1 ] && [ -n "$kept" ] && cmp -s "$kept" "$tmp/before" \
+     && grep -qF "original kept at $kept" <<<"$out"; then ok "$label"
+  else no "$label"; echo "$out"; fi
+  chmod 644 -- "$default"; rm -f -- "$default".*
+}
+if [ "$(id -u)" = 0 ]; then
+  ok 'failed restore after merge keeps the backup (skipped: root)'
+  ok 'failed restore after check keeps the backup (skipped: root)'
+else
+  check_kept 'failed restore after merge keeps the backup' "$fake/herdr/apply-config.sh" MERGE_RO=1
+  check_kept 'failed restore after check keeps the backup' "$apply" CHECK_RC=1 CHECK_RO=1
+fi
 
 rm -f -- "$default"; mkdir -p -- "$tmp/custom"; : > "$tmp/calls"
 out=$(HERDR_CONFIG_PATH="$tmp/custom/c.toml" bash "$apply" 2>&1); rc=$?

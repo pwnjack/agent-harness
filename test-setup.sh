@@ -3,6 +3,8 @@
 set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+self=$repo/test-setup.sh
+unset HERDR_CONFIG_PATH HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE HARNESS_SIDEBAR_SYNC
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/home/.claude" CODEX_HOME="$tmp/home/.codex"
@@ -379,6 +381,16 @@ if [ -s "$tmp/removal.sh" ] && bash "$tmp/removal.sh" > "$tmp/removal-output" 2>
 else
   no 'removal: documented commands remove logical clone links and preserve the disabled brain'
   cat -- "$tmp/removal-output"
+fi
+
+# An inherited Herdr config path must stay untouched: run this suite again with
+# a sentinel in the environment and require the sentinel to stay byte-identical.
+if [ -z "${TEST_SETUP_NESTED:-}" ]; then
+  printf '# sentinel\n[keys]\nprefix = "ctrl+a"\n' > "$tmp/sentinel.toml"
+  cp -- "$tmp/sentinel.toml" "$tmp/sentinel.before"
+  TEST_SETUP_NESTED=1 HERDR_CONFIG_PATH="$tmp/sentinel.toml" bash -- "$self" > "$tmp/nested-output" 2>&1
+  if cmp -s -- "$tmp/sentinel.before" "$tmp/sentinel.toml"; then ok 'inherited HERDR_CONFIG_PATH is left untouched'
+  else no 'inherited HERDR_CONFIG_PATH is left untouched'; fi
 fi
 
 exit "$fail"

@@ -57,10 +57,10 @@ if wait_for 'repo=fallback'; then ok "cwd falls back to .cwd"
 else no "cwd falls back to .cwd"; cat "$tmp/calls"; fi
 
 : > "$tmp/calls"; rm -rf -- "$XDG_STATE_HOME/harness"
-start=$(date +%s)
+start=$(jq -n now)
 HERDR_STUB_HANG=1 bash "$statusline" <<<"$input" >/dev/null
-elapsed=$(( $(date +%s) - start ))
-if [ "$elapsed" -le 1 ]; then ok "hung herdr: status line prints within 1 s"
-else no "hung herdr: status line prints within 1 s (took ${elapsed}s)"; fi
+elapsed=$(jq -n --argjson s "$start" 'now - $s')
+if jq -en --argjson e "$elapsed" '$e <= 1' >/dev/null; then ok "hung herdr: status line prints within 1 s"
+else no "hung herdr: status line prints within 1 s (took ${elapsed} s)"; fi
 
 exit "$fail"

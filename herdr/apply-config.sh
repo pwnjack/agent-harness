@@ -17,14 +17,27 @@ export HERDR_CONFIG_PATH=$target
 mkdir -p -- "$(dirname -- "$target")"
 [ -f "$target" ] || : > "$target"
 backup=$(mktemp "$target.XXXXXX")
-trap 'rm -f -- "$backup"' EXIT
+keep=
+trap '[ -n "$keep" ] || rm -f -- "$backup"' EXIT
 cp -- "$target" "$backup"
 
-bash "$repo/lib/toml-merge.sh" herdr "$target" "$here/sidebar.toml"
+# restore <why>: put the backup back; if that fails, keep it and say where it is.
+restore() {
+  if cp -- "$backup" "$target"; then
+    echo "herdr: $1; restored $target"
+  else
+    keep=1
+    echo "herdr: $1; could not restore $target, original kept at $backup" >&2
+  fi
+}
+
+if ! bash "$repo/lib/toml-merge.sh" herdr "$target" "$here/sidebar.toml"; then
+  restore 'merge failed'
+  exit 1
+fi
 
 if ! check=$(herdr config check 2>&1); then
-  cp -- "$backup" "$target"
-  echo "herdr: config check failed; restored $target"
+  restore 'config check failed'
   printf '%s\n' "$check"
   exit 1
 fi

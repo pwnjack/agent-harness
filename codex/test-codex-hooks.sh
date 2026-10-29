@@ -124,6 +124,14 @@ if [ "$status" = 1 ] && [ "$(cat "$CODEX_HOME/hooks.json")" = '{ not json' ] \
   ok "invalid JSON refused, file unchanged, exit 1"
 else no "invalid JSON refused, file unchanged, exit 1"; cat "$tmp/merge-output"; fi
 
+printf '{"hooks":{}}\n{"hooks":{}}\n' > "$CODEX_HOME/hooks.json"
+cp -- "$CODEX_HOME/hooks.json" "$tmp/two-docs"
+bash "$here/apply-hooks.sh" > "$tmp/merge-output" 2>&1; status=$?
+if [ "$status" = 1 ] && cmp -s "$tmp/two-docs" "$CODEX_HOME/hooks.json" \
+   && grep -qx 'codex: hooks.json is not valid JSON; left unchanged' "$tmp/merge-output"; then
+  ok "two root documents refused, file unchanged, exit 1"
+else no "two root documents refused, file unchanged, exit 1"; cat "$tmp/merge-output"; fi
+
 rm -f -- "$CODEX_HOME/hooks.json"
 if bash "$here/apply-hooks.sh" > "$tmp/merge-output" 2>&1 \
    && jq -e '[.hooks[] | length] == [1,1,1,1]

@@ -10,7 +10,7 @@ cmd="bash '$HOME/.claude/harness/codex/hooks/sidebar.sh'"
 [ -d "$(dirname "$target")" ] || { echo "codex: not installed, skipping"; exit 0; }
 
 if [ -f "$target" ]; then
-  jq -e 'type == "object"' "$target" >/dev/null 2>&1 \
+  jq -es 'length == 1 and (.[0] | type == "object")' "$target" >/dev/null 2>&1 \
     || { echo "codex: hooks.json is not valid JSON; left unchanged"; exit 1; }
   current=$(cat -- "$target")
 else

@@ -39,8 +39,10 @@ including Herdr, so they never install hooks or units on the host.
 - `herdr/test-sidebar-report.sh`: the reporter's complete token patch, role
   mapping, repository naming, deduplication, silence outside Herdr and the
   watchdog on a hung call.
+- `test-driver.sh`: `test.sh` clears inherited Herdr environment variables
+  before running the suites.
 - `herdr/test-apply-config.sh`: the Card layout merge, rollback on a failed
-  config check, the `rows_by_agent` warning, reload and skipping without Herdr.
+  merge or config check, the backup kept when rollback fails, the `rows_by_agent` warning, reload and skipping without Herdr.
 - `claude/test-statusline.sh`: the status line reports to the sidebar without
   changing what it prints.
 - `codex/test-codex-hooks.sh`: the Codex sidebar hook (model slug, effort from
