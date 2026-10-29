@@ -131,12 +131,14 @@ if have codex; then
   echo "codex: linking harness"
   link "$repo/codex/AGENTS.global.md" "$codex_dir/AGENTS.md"
   run bash "$repo/codex/apply-config.sh"
+  run bash "$repo/codex/apply-hooks.sh"
 else
   echo "codex: not installed, skipping"
 fi
 
-# Install agent-state hooks through Herdr.
+# Merge the sidebar layout, then install agent-state hooks through Herdr.
 if have herdr; then
+  run bash "$repo/herdr/apply-config.sh"
   for agent in claude codex; do
     have "$agent" || continue
     if ! $dry && herdr integration status 2>/dev/null | grep -q "^$agent: current"; then continue; fi

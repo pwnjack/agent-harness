@@ -40,7 +40,7 @@ prepare_clone() {
   repo=$1
   mkdir -p -- "$repo" || return 1
   cp -- "$source_repo/setup.sh" "$repo/setup.sh" || return 1
-  for directory in claude codex brain githooks lib; do
+  for directory in claude codex brain githooks herdr lib; do
     cp -R -- "$source_repo/$directory" "$repo/$directory" || return 1
   done
   git init -q -b main -- "$repo"
@@ -118,6 +118,34 @@ else no 'fresh: dry run leaves home absent'; fi
 setup
 if [ "$(readlink "$HOME/.claude/harness")" = "$repo" ]; then ok 'fresh: ~/.claude/harness points at the clone'
 else no 'fresh: ~/.claude/harness points at the clone'; fi
+
+# The Herdr sidebar layout and the Codex hooks reach their live files.
+export HOME="$tmp/sidebar" CLAUDE_CONFIG_DIR="$tmp/sidebar/.claude" CODEX_HOME="$tmp/sidebar/.codex"
+export XDG_CONFIG_HOME="$tmp/sidebar/config"
+mkdir -p -- "$CODEX_HOME"
+herdr_config="$XDG_CONFIG_HOME/herdr/config.toml"
+setup --dry-run
+if [ ! -e "$herdr_config" ] && [ ! -e "$CODEX_HOME/hooks.json" ]; then
+  ok 'dry run: neither file written'
+else no 'dry run: neither file written'; fi
+setup
+if grep -qxF -- 'sidebar_width = 34' "$herdr_config" 2>/dev/null; then ok 'setup: herdr layout merged'
+else no 'setup: herdr layout merged'; fi
+if jq -e '[.hooks.SessionStart, .hooks.UserPromptSubmit, .hooks.PostToolUse, .hooks.Stop][]
+  | any(.[].hooks[]?; .command | contains("codex/hooks/sidebar.sh"))' \
+  "$CODEX_HOME/hooks.json" >/dev/null 2>&1; then
+  ok 'setup: codex sidebar hooks added'
+else no 'setup: codex sidebar hooks added'; fi
+cp -- "$herdr_config" "$tmp/herdr-once"
+cp -- "$CODEX_HOME/config.toml" "$tmp/codex-config-once"
+cp -- "$CODEX_HOME/hooks.json" "$tmp/hooks-once"
+setup
+if cmp -s -- "$tmp/herdr-once" "$herdr_config" \
+   && cmp -s -- "$tmp/codex-config-once" "$CODEX_HOME/config.toml" \
+   && cmp -s -- "$tmp/hooks-once" "$CODEX_HOME/hooks.json"; then
+  ok 'second setup: herdr config, codex config and hooks.json byte-identical'
+else no 'second setup: herdr config, codex config and hooks.json byte-identical'; fi
+export XDG_CONFIG_HOME="$tmp/config"
 
 # The stable command path stays in ~/.claude with a custom config directory.
 export HOME="$tmp/custom" CLAUDE_CONFIG_DIR="$tmp/custom-config" CODEX_HOME="$tmp/custom-codex"

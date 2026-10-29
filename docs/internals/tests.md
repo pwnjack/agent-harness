@@ -6,7 +6,8 @@ use a temporary HOME, config and state directories and stub machine commands,
 including Herdr, so they never install hooks or units on the host.
 
 - `test-setup.sh`: upgrades and fresh installs, the fixed harness link with
-  custom config paths, settings preservation, dry runs, the private Linux-only
+  custom config paths, settings preservation, dry runs, the Herdr layout and
+  Codex hooks wiring, the private Linux-only
   brain setup, refusal of foreign repositories, rendered units, repeat runs,
   and the removal block in `docs/internals/setup.md` run verbatim.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
@@ -35,6 +36,13 @@ including Herdr, so they never install hooks or units on the host.
   `advisorModel`, worker bypass, settings mode and malformed settings.
 - `codex/test-codex-config.sh`: `memories = false`, preservation of unrelated
   settings and repeat merges.
+- `herdr/test-sidebar-report.sh`: the reporter's complete token patch, role
+  mapping, repository naming, deduplication, silence outside Herdr and the
+  watchdog on a hung call.
+- `herdr/test-apply-config.sh`: the Card layout merge, rollback on a failed
+  config check, the `rows_by_agent` warning, reload and skipping without Herdr.
+- `claude/test-statusline.sh`: the status line reports to the sidebar without
+  changing what it prints.
 - `codex/test-codex-hooks.sh`: the Codex sidebar hook (model slug, effort from
   the transcript, silence) and the `hooks.json` merge beside Herdr's entry.
 - `lib/test-toml-merge.sh`: multi-line fragment values replacing one-line and

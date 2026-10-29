@@ -67,6 +67,8 @@ reset hook leave the user's choice alone.
 
 ## pane.sh behaviour
 
+- `pane.sh` sets `HARNESS_ROLE=<role>` on each worker pane, so the Herdr
+  sidebar shows the worker's role.
 - On a Codex "hooks need review" screen, `pane.sh` sends Escape and resends
   the prompt once. Never answer that screen with
   "trust all"; that is the user's call.
