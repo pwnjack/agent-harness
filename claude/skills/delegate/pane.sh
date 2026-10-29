@@ -184,7 +184,7 @@ if [ -n "$kind" ]; then
   if [ -n "$column" ]; then split=(--pane "$column" --direction down)
   else split=(--pane "$HERDR_PANE_ID" --direction right); fi
   # The worker starts in the caller's directory (a worktree, for SDD).
-  pane=$(herdr pane split "${split[@]}" --cwd "$PWD" --ratio 0.5 --no-focus \
+  pane=$(herdr pane split "${split[@]}" --cwd "$PWD" --ratio 0.5 --no-focus --env "HARNESS_ROLE=$role" \
     | jq -r '.result.pane_id // .result.pane.pane_id // empty')
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
   if ! herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null; then
