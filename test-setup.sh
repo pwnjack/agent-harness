@@ -40,7 +40,7 @@ prepare_clone() {
   repo=$1
   mkdir -p -- "$repo" || return 1
   cp -- "$source_repo/setup.sh" "$repo/setup.sh" || return 1
-  for directory in claude codex brain githooks; do
+  for directory in claude codex brain githooks lib; do
     cp -R -- "$source_repo/$directory" "$repo/$directory" || return 1
   done
   git init -q -b main -- "$repo"

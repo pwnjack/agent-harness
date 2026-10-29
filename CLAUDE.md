@@ -16,6 +16,7 @@ settings. Never track logins, memory, caches or tool-written configuration.
 - `codex/`: Codex global instructions and curated configuration.
 - `brain/`: private memory audit, commit scripts and user timer templates.
 - `githooks/`: staged-tree export and the pre-commit test gate.
+- `lib/`: shared scripts, such as the TOML merger.
 - `docs/internals/`: one manual per part, read before changing it.
 
 Run `./test.sh` before committing. It discovers every tracked `test-*.sh`,

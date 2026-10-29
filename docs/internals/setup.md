@@ -12,7 +12,7 @@
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |
 | `codex/AGENTS.global.md` | `~/.codex/AGENTS.md` | symlink |
-| `codex/*.toml` | `~/.codex/config.toml` | merged by `codex/apply-config.sh` |
+| `codex/*.toml` | `~/.codex/config.toml` | merged by `codex/apply-config.sh` through `lib/toml-merge.sh` |
 | `brain/gitignore` | `<config>/projects/.gitignore` | exact copy, committed in the brain |
 | `brain/brain-commit.service.in`, `brain/brain-commit.timer` | `~/.config/systemd/user/` | rendered with `--brain` |
 
