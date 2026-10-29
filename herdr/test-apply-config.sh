@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # apply-config.sh merges the Card layout into Herdr's config and rolls back on a failed check.
 set -uo pipefail
+unset HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE HERDR_CONFIG_PATH
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 real_herdr=$(command -v herdr 2>/dev/null || true)
 tmp=$(mktemp -d); trap 'rm -rf -- "$tmp"' EXIT
@@ -28,7 +29,7 @@ for tool in bash awk sed mktemp cp rm cat dirname basename mkdir cmp grep; do
   ln -s -- "$(command -v "$tool")" "$tmp/nobin/$tool"
 done
 export PATH="$tmp/bin:$PATH"
-unset HERDR_CONFIG_PATH CHECK_RC SERVER_RC
+unset HERDR_CONFIG_PATH CHECK_RC SERVER_RC HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE
 fail=0
 ok() { printf 'ok   %s\n' "$1"; }
 no() { printf 'FAIL %s\n' "$1"; fail=1; }
@@ -77,10 +78,34 @@ if [ "$rc" = 0 ] && grep -q "herdr: warning: rows_by_agent.claude in $default re
   ok 'rows_by_agent.claude warns and survives'
 else no 'rows_by_agent.claude warns and survives'; fi
 
+# warns <agent> <fragment>: run against a live file with the fragment appended.
+warned() {
+  live; printf '%s' "$2" >> "$default"
+  local out; out=$(bash "$apply" 2>&1)
+  grep -q "herdr: warning: rows_by_agent.$1 in $default replaces" <<<"$out"
+}
+warned claude $'\n[ui.sidebar.agents.rows_by_agent] # mine\nclaude = [["state_icon"]]\n' \
+  && ok 'warns: header with trailing comment' || no 'warns: header with trailing comment'
+warned claude $'\n[ui.sidebar.agents.rows_by_agent]\n"claude" = [["state_icon"]]\n' \
+  && ok 'warns: quoted key' || no 'warns: quoted key'
+warned codex $'\n[ui.sidebar.agents]\nrows_by_agent.codex = [["state_icon"]]\n' \
+  && ok 'warns: dotted key inside agents table' || no 'warns: dotted key inside agents table'
+live; { printf 'ui.sidebar.agents.rows_by_agent.claude = [["state_icon"]]\n'; cat -- "$default"; } > "$tmp/top" && cp -- "$tmp/top" "$default"
+out=$(bash "$apply" 2>&1)
+grep -q 'rows_by_agent.claude in' <<<"$out" && ok 'warns: fully dotted top-level key' || no 'warns: fully dotted top-level key'
+warned claude $'\n[other]\nrows_by_agent.claude = 1\n[other.rows_by_agent]\nclaude = 1\n' \
+  && no 'no warning under unrelated table' || ok 'no warning under unrelated table'
+
 live; : > "$tmp/calls"
 out=$(SERVER_RC=1 bash "$apply" 2>&1); rc=$?
 if [ "$rc" = 0 ] && ! grep -q reload-config "$tmp/calls" && ! grep -q 'reloaded' <<<"$out"; then ok 'reload only when server answers'
 else no 'reload only when server answers'; fi
+
+mkdir -p -- "$tmp/rel"
+out=$(cd "$tmp/rel" && HERDR_CONFIG_PATH=relative.toml bash "$apply" 2>&1); rc=$?
+if [ "$rc" = 0 ] && [ -f "$tmp/rel/relative.toml" ] && grep -q 'sidebar_width = 34' "$tmp/rel/relative.toml"; then
+  ok 'relative HERDR_CONFIG_PATH is merged'
+else no 'relative HERDR_CONFIG_PATH is merged'; fi
 
 live; cp -- "$default" "$tmp/before"
 out=$(PATH="$tmp/nobin" "$BASH" "$apply" 2>&1); rc=$?

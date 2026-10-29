@@ -14,7 +14,7 @@ fi
 
 target=${HERDR_CONFIG_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/herdr/config.toml}
 export HERDR_CONFIG_PATH=$target
-mkdir -p -- "${target%/*}"
+mkdir -p -- "$(dirname -- "$target")"
 [ -f "$target" ] || : > "$target"
 backup=$(mktemp "$target.XXXXXX")
 trap 'rm -f -- "$backup"' EXIT
@@ -29,13 +29,24 @@ if ! check=$(herdr config check 2>&1); then
   exit 1
 fi
 
-# A per-agent row set replaces the Card layout for that agent.
+# A per-agent row set replaces the Card layout for that agent. Headers and
+# keys are normalised (comments, spaces and quotes dropped) and joined, so
+# only the full ui.sidebar.agents.rows_by_agent.<agent> namespace matches.
 for agent in claude codex; do
-  if awk -v agent="$agent" '
-    /^[ \t]*\[/ { t = $0; gsub(/[ \t\[\]]/, "", t); next }
+  if awk -v want="ui.sidebar.agents.rows_by_agent.$agent" '
+    function norm(s) { gsub(/[ \t"\047]/, "", s); return s }
     { l = $0; sub(/^[ \t]+/, "", l) }
-    t ~ /(^|\.)rows_by_agent$/ && index(l, agent) == 1 && l ~ "^" agent "[ \t]*=" { found = 1 }
-    index(l, "rows_by_agent." agent) && l ~ "rows_by_agent\\." agent "[ \t]*=" { found = 1 }
+    l ~ /^\[[^]]*\][ \t]*(#.*)?$/ {
+      h = l; sub(/\][ \t]*(#.*)?$/, "", h); sub(/^\[+/, "", h)
+      if (h ~ /^[A-Za-z0-9_. "\047-]+$/) table = norm(h)
+      next
+    }
+    index(l, "=") {
+      k = substr(l, 1, index(l, "=") - 1)
+      if (k !~ /^[A-Za-z0-9_. "\047-]+$/) next
+      k = norm(k)
+      if ((table == "" ? k : table "." k) == want) found = 1
+    }
     END { exit !found }
   ' "$target"; then
     echo "herdr: warning: rows_by_agent.$agent in $target replaces the Card layout for $agent"
