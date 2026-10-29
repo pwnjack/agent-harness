@@ -96,6 +96,11 @@ grep -q 'rows_by_agent.claude in' <<<"$out" && ok 'warns: fully dotted top-level
 warned claude $'\n[other]\nrows_by_agent.claude = 1\n[other.rows_by_agent]\nclaude = 1\n' \
   && no 'no warning under unrelated table' || ok 'no warning under unrelated table'
 
+warned claude $'\n["ui.sidebar.agents.rows_by_agent"]\nclaude = 1\n' \
+  && no 'no warning under a quoted dotted table name' || ok 'no warning under a quoted dotted table name'
+warned claude $'\n[ui.sidebar.agents.rows_by_agent]\nother = 1\n[other."a:b"]\nclaude = 1\n' \
+  && no 'no warning after an unreadable header resets scope' || ok 'no warning after an unreadable header resets scope'
+
 live; : > "$tmp/calls"
 out=$(SERVER_RC=1 bash "$apply" 2>&1); rc=$?
 if [ "$rc" = 0 ] && ! grep -q reload-config "$tmp/calls" && ! grep -q 'reloaded' <<<"$out"; then ok 'reload only when server answers'

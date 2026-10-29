@@ -30,21 +30,36 @@ if ! check=$(herdr config check 2>&1); then
 fi
 
 # A per-agent row set replaces the Card layout for that agent. Headers and
-# keys are normalised (comments, spaces and quotes dropped) and joined, so
-# only the full ui.sidebar.agents.rows_by_agent.<agent> namespace matches.
+# keys are read as dotted paths of bare or wholly quoted segments; anything
+# else is unreadable and matches nothing, and every header resets the scope,
+# so only ui.sidebar.agents.rows_by_agent.<agent> warns.
 for agent in claude codex; do
   if awk -v want="ui.sidebar.agents.rows_by_agent.$agent" '
-    function norm(s) { gsub(/[ \t"\047]/, "", s); return s }
+    # path(s): dotted path of simple segments, quotes dropped; "!" if unreadable
+    function path(s,   out, seg) {
+      out = ""
+      while (1) {
+        sub(/^[ \t]+/, "", s)
+        if (match(s, /^[A-Za-z0-9_-]+/)) seg = substr(s, 1, RLENGTH)
+        else if (match(s, /^"[A-Za-z0-9_-]+"/) || match(s, /^\047[A-Za-z0-9_-]+\047/)) seg = substr(s, 2, RLENGTH - 2)
+        else return "!"
+        out = (out == "" ? seg : out "." seg)
+        s = substr(s, RLENGTH + 1)
+        sub(/^[ \t]+/, "", s)
+        if (s == "") return out
+        if (substr(s, 1, 1) != ".") return "!"
+        s = substr(s, 2)
+      }
+    }
     { l = $0; sub(/^[ \t]+/, "", l) }
-    l ~ /^\[[^]]*\][ \t]*(#.*)?$/ {
-      h = l; sub(/\][ \t]*(#.*)?$/, "", h); sub(/^\[+/, "", h)
-      if (h ~ /^[A-Za-z0-9_. "\047-]+$/) table = norm(h)
+    l ~ /^\[/ && l ~ /\][ \t]*(#.*)?$/ {
+      h = l; sub(/\]+[ \t]*(#.*)?$/, "", h); sub(/^\[+/, "", h)
+      table = path(h)
       next
     }
     index(l, "=") {
-      k = substr(l, 1, index(l, "=") - 1)
-      if (k !~ /^[A-Za-z0-9_. "\047-]+$/) next
-      k = norm(k)
+      k = path(substr(l, 1, index(l, "=") - 1))
+      if (k == "!" || table == "!") next
       if ((table == "" ? k : table "." k) == want) found = 1
     }
     END { exit !found }
