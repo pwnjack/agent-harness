@@ -24,6 +24,7 @@ fi
 # Keep every suite away from machine state, even if it calls setup.sh.
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
+unset HERDR_CONFIG_PATH HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE HARNESS_SIDEBAR_SYNC
 mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin" || exit 1
 for command in systemctl uname gh ssh-add; do
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command" || exit 1

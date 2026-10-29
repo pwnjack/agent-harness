@@ -12,7 +12,11 @@
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |
 | `codex/AGENTS.global.md` | `~/.codex/AGENTS.md` | symlink |
-| `codex/*.toml` | `~/.codex/config.toml` | merged by `codex/apply-config.sh` |
+| `codex/*.toml` | `~/.codex/config.toml` | merged by `codex/apply-config.sh` through `lib/toml-merge.sh` |
+| `codex/hooks/sidebar.sh` | named in `~/.codex/hooks.json` | merged by `codex/apply-hooks.sh` |
+| `herdr/sidebar.toml` | Herdr's `config.toml` | merged by `herdr/apply-config.sh` through `lib/toml-merge.sh` |
+| `herdr/sidebar-report.sh` | called by the status line and the Codex hook | run in place |
+| `lib/toml-merge.sh` | called by the apply scripts | run in place |
 | `brain/gitignore` | `<config>/projects/.gitignore` | exact copy, committed in the brain |
 | `brain/brain-commit.service.in`, `brain/brain-commit.timer` | `~/.config/systemd/user/` | rendered with `--brain` |
 
@@ -66,12 +70,36 @@ Superpowers is the only plugin: listed in the tracked settings and installed
 by `setup.sh`. `pane.sh` starts Claude workers without it. Its plans and specs
 in `docs/superpowers/` stay local and untracked.
 
-## Status lines
+## Status lines and sidebar
 
 `claude/statusline.sh` prints the model and effort, the context as a one-cell
 pie with token counts, and the 5-hour and 7-day limits as FiraCode progress
 bars with their reset times (12 h or 24 h, following `options/clock` when the
-dotfiles provide it). Codex shows the same fields from `codex/statusline.toml`.
+dotfiles provide it). Codex shows the same fields from `codex/statusline.toml`,
+with `terminal_title` set to the spinner and the thread title.
+
+`herdr/sidebar.toml` gives Herdr's agent sidebar a 34-column Card layout of
+three rows per agent: state icon, `$repo` and `$role`; `$model` and `$effort`;
+the stripped terminal title. Four tokens fill it, reported under the source
+`harness:sidebar` by `herdr/sidebar-report.sh <cwd> <model> <effort>`:
+
+- `repo`: the main repository's name, also for a linked worktree.
+- `role`: from `HARNESS_ROLE`, which `pane.sh` sets on workers (`impl`,
+  `review`, `explore`, `fix`); any other pane is `orchestrator`.
+- `model`: the model name the caller passes.
+- `effort`: a five-cell meter and the level.
+
+`claude/statusline.sh` calls the reporter on each render with the Claude model
+and effort. `codex/hooks/sidebar.sh` calls it on `SessionStart`,
+`UserPromptSubmit`, `PostToolUse` and `Stop`, taking the model slug and effort
+from the Codex transcript. The reporter does nothing outside Herdr and never
+fails its caller.
+
+`herdr/apply-config.sh` checks the merged file with `herdr config check`,
+restores it if Herdr rejects it, and reloads a running server. It warns when
+`ui.sidebar.agents.rows_by_agent.claude` or `.codex` is set, because a
+per-agent row set replaces the Card layout for that agent. Codex runs a new
+hook only after the user trusts it once in an interactive session.
 
 ## Removing the harness
 

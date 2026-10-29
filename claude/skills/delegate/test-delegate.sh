@@ -276,6 +276,9 @@ then echo "ok   pane prompt: says the list keys are arrays of strings"; else ech
 # The pane is named <role>-<model>-<task>: the alias, or "codex" when
 # config.toml's model runs (inherit, or an alias that degraded onto it).
 verdict inherit     0 REPORT   yes codex inherit medium review t-inherit "$b"
+# The worker pane carries its role so the herdr sidebar can label it.
+if grep -A1 -x -- --env "$tmp/state-inherit/split" | tail -1 | grep -qxF -- HARNESS_ROLE=review
+then echo "ok   pane split: role in the worker's environment"; else echo "FAIL pane split: role env $(cat "$tmp/state-inherit/split")"; fail=1; fi
 CACHE=/nonexistent verdict degrade 0 REPORT yes codex sol medium review t-degrade "$b"
 for want in claude:impl-sonnet-t-claude happy:impl-sol-t-happy inherit:review-codex-t-inherit degrade:review-codex-t-degrade; do
   got=$(sed -n 3p "$tmp/state-${want%%:*}/start" 2>/dev/null)
@@ -283,7 +286,7 @@ for want in claude:impl-sonnet-t-claude happy:impl-sol-t-happy inherit:review-co
 done
 # A later delegate joins this tab's delegate column, found by its role prefix.
 verdict column      0 REPORT   yes
-if [ "$(tr '\n' ' ' < "$tmp/state-column/split")" = "pane split --pane p9 --direction down --cwd $PWD --ratio 0.5 --no-focus " ]
+if [ "$(tr '\n' ' ' < "$tmp/state-column/split")" = "pane split --pane p9 --direction down --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=impl " ]
 then echo "ok   pane column: splits the last delegate in this tab"; else echo "FAIL pane column: split $(cat "$tmp/state-column/split")"; fail=1; fi
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]

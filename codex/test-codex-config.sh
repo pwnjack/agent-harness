@@ -29,4 +29,14 @@ if bash "$here/apply-config.sh" > "$tmp/merge-output" 2>&1 \
   ok "second merge: config byte-identical"
 else no "second merge: config byte-identical"; fi
 
+cp -- "$here/testdata/full-config.toml" "$CODEX_HOME/config.toml"
+if bash "$here/apply-config.sh" > "$tmp/merge-output" 2>&1 \
+   && cmp -s -- "$here/testdata/full-config.expected.toml" "$CODEX_HOME/config.toml"; then
+  ok "full config: only tracked keys change"
+else no "full config: only tracked keys change"; fi
+if bash "$here/apply-config.sh" > "$tmp/merge-output" 2>&1 \
+   && cmp -s -- "$here/testdata/full-config.expected.toml" "$CODEX_HOME/config.toml"; then
+  ok "full config: second merge identical"
+else no "full config: second merge identical"; fi
+
 exit "$fail"
