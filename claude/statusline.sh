@@ -7,10 +7,11 @@
 time_locale=${LC_ALL:-${LC_TIME:-${LANG:-C}}}
 export LC_ALL=C   # Use the C locale for numeric formatting.
 input=$(cat)
-IFS=$'\x1f' read -r model effort used total win fiveh fiveh_at week week_at < <(
+IFS=$'\x1f' read -r model effort cwd used total win fiveh fiveh_at week week_at < <(
   jq -r '[
     (.model.display_name // "" | sub(" *\\(.*\\)$"; "")),
     (.effort.level // ""),
+    (.workspace.current_dir // .cwd // ""),
     (.context_window.used_percentage // ""),
     (.context_window | if .total_input_tokens == null and .total_output_tokens == null then ""
        else (.total_input_tokens // 0) + (.total_output_tokens // 0) end),
@@ -21,6 +22,10 @@ IFS=$'\x1f' read -r model effort used total win fiveh fiveh_at week week_at < <(
     (.rate_limits.seven_day.resets_at // "")
   ] | map(tostring) | join("\u001f")' <<<"$input"
 )
+
+# Feed the herdr sidebar; the reporter detaches its own Herdr call.
+reporter="$(dirname "${BASH_SOURCE[0]}")/../herdr/sidebar-report.sh"
+bash "$reporter" "$cwd" "$model" "$effort" </dev/null >/dev/null 2>&1 || true
 
 fmt_tok() { awk -v n="$1" 'BEGIN{if(n>=1000000)printf"%.1fM",n/1000000;else if(n>=1000)printf"%.0fk",n/1000;else printf"%d",n}'; }
 # seconds until an epoch timestamp, as 2d3h / 2h14m / 9m
