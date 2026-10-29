@@ -9,10 +9,14 @@
 - **One review mandate.** Only `CLAUDE.global.md` requires a review.
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call.
-  The first worker splits the orchestrator's pane to the right, later ones
-  stack below the newest worker, and each opens in the caller's directory, so
-  an SDD worktree is the worker's project root and sandbox. The Agent tool is
-  only the Claude fallback outside Herdr; it honours `model`.
+  The first worker splits the orchestrator's pane to the right and the second
+  splits that worker, a column of two. Further workers go to `crew`, `crew-2`,
+  `crew-3`… tabs of four (2×2) in the same workspace. A new worker splits the
+  largest pane, along its longer side, so every pane is a half or a quarter;
+  Herdr gives a closed worker's space to its sibling and closes a tab when its
+  last pane closes. Each worker opens in the caller's directory, so an SDD
+  worktree is the worker's project root and sandbox. The Agent tool is only the
+  Claude fallback outside Herdr; it honours `model`.
 - **Superpowers dispatches are roles.** The `delegate` skill maps each
   implementer and reviewer onto a pane, picks its model from the same table,
   and keeps every reviewer cross-family and blind, SDD's per-task reviewer
@@ -86,3 +90,9 @@ reset hook leave the user's choice alone.
 - Pane names follow `<role>-<model>-<task>` and must match
   `^[a-z][a-z0-9_-]{0,31}$`; `pane.sh` refuses any other name and finds the
   delegate column by the role prefix.
+- Placement: no column worker splits the orchestrator right; fewer than two
+  splits the largest column pane; a full column fills the first `crew` tab
+  (then `crew-2`…) with fewer than four panes, else creates the first unused
+  label with `herdr tab create` and starts the worker in its root pane. A
+  failing Herdr read falls back to splitting the last column pane down; a
+  failed split or tab create is NOSTART.

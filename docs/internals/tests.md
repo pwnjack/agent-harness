@@ -23,8 +23,10 @@ including Herdr, so they never install hooks or units on the host.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
   gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
   recovery, limit text that is not a quota hit, malformed reports, `--wait`
-  and `--resume` keeping the pane, the trust-prompt BLOCKED, and the worker
-  settings that disable Superpowers and the advisor.
+  and `--resume` keeping the pane, the trust-prompt BLOCKED, the worker
+  settings that disable Superpowers and the advisor, and the pane placement
+  (column of two, `crew` tabs of four, other workspaces ignored, fallback when
+  `tab list` fails, role on every split and tab).
 - `claude/skills/delegate/test-sdd-brief.sh`: every brief kind is filled and
   blind, bad ranges and changed templates are refused, hostile titles and
   file names stay literal; against stand-in templates. Under `./test.sh` the
