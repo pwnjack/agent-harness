@@ -70,15 +70,15 @@ largest() { # pane-in-tab candidates
 }
 split_largest() { # pane-in-tab candidates fallback-pane
   local target id dir
-  target=$(largest "$1" "$2")
-  if [ -n "$target" ]; then read -r id dir <<<"$target"; else id=$3 dir=down; fi
+  # A read that failed after printing something is as unusable as none.
+  if target=$(largest "$1" "$2") && [ -n "$target" ]; then read -r id dir <<<"$target"; else id=$3 dir=down; fi
   split_pane "$id" "$dir"
 }
 place() {
   local cols last tabs panes i label tid ids unused=
   cols=$(herdr agent list 2>/dev/null | jq -c --arg tab "${HERDR_TAB_ID:-}" --arg roles "$ROLES" \
-    '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-"))) | .pane_id]' 2>/dev/null)
-  [ -n "$cols" ] || cols='[]'
+    '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-"))) | .pane_id]' 2>/dev/null) \
+    && [ -n "$cols" ] || cols='[]'
   last=$(jq -r 'last // empty' <<<"$cols")
   if [ -z "$last" ]; then pane=$(split_pane "$HERDR_PANE_ID" right); return; fi
   if [ "$(jq length <<<"$cols")" -lt "$COLUMN_SLOTS" ]; then

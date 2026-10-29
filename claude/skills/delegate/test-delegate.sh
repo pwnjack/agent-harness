@@ -173,7 +173,7 @@ cat > "$tmp/bin/herdr" <<'STUB'
 S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
 case "$1 $2" in
-  "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"
+  "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
                 elif [ "$SCEN" = column ]; then
                   echo '{"result":{"agents":[{"tab_id":"t0","pane_id":"p9","name":"review-sol-x"},{"tab_id":"t9","pane_id":"p7","name":"impl-sol-y"},{"tab_id":"t0","pane_id":"p8","name":"reviewer"}]}}'
                 else echo '{"result":{"agents":[]}}'; fi ;;
@@ -183,7 +183,8 @@ case "$1 $2" in
   # placement fixtures: agents, tabs, panes and layout files in the state dir
   "tab list") [ -e "$S/tabfail" ] && exit 1; cat "$S/tabs" 2>/dev/null || echo '{"result":{"tabs":[]}}' ;;
   "pane list") cat "$S/panes" 2>/dev/null || echo '{"result":{"panes":[]}}' ;;
-  "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1 ;;
+  "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1
+                ! [ -e "$S/layoutjunk" ] || echo '{not json'; ! [ -e "$S/layoutexit" ] || exit 1 ;;
   "tab create") printf '%s\n' "$@" > "$S/tabcreate"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
   "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
@@ -349,6 +350,18 @@ recorded "other workspace's crew ignored" "$d" tabcreate "tab create --label cre
 
 d=$(fx_dir tabfail); fx_agents "$d" p9 p8; touch "$d/tabfail"; launch tabfail
 recorded "tab list failure falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+
+# a read that prints something usable and then fails is not trusted
+d=$(fx_dir layjunk); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pc1; fx_layout "$d" pc1:219:66
+touch "$d/layoutjunk"; launch layjunk
+recorded "layout followed by malformed data falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+d=$(fx_dir layexit); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pc1; fx_layout "$d" pc1:219:66
+touch "$d/layoutexit"; launch layexit
+recorded "layout from a failing herdr falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+d=$(fx_dir agjunk); fx_agents "$d" p9 p8; touch "$d/agentsjunk"; launch agjunk
+recorded "agent list followed by malformed data counts no column" "$d" split "pane split --pane p0 --direction right $common"
+d=$(fx_dir agexit); fx_agents "$d" p9 p8; touch "$d/agentsexit"; launch agexit
+recorded "agent list from a failing herdr counts no column" "$d" split "pane split --pane p0 --direction right $common"
 
 # the role reaches every split and every tab create
 d=$(fx_dir rolesplit); launch rolesplit review
