@@ -22,3 +22,4 @@ env = { A = "1" }
 [tui]
 status_line = ["model-with-reasoning", "context-used", "used-tokens", "context-window-size", "five-hour-limit", "weekly-limit"]
 status_line_use_colors = true
+terminal_title = ["spinner", "thread-title"]

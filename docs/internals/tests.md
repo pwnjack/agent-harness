@@ -35,6 +35,8 @@ including Herdr, so they never install hooks or units on the host.
   `advisorModel`, worker bypass, settings mode and malformed settings.
 - `codex/test-codex-config.sh`: `memories = false`, preservation of unrelated
   settings and repeat merges.
+- `codex/test-codex-hooks.sh`: the Codex sidebar hook (model slug, effort from
+  the transcript, silence) and the `hooks.json` merge beside Herdr's entry.
 - `lib/test-toml-merge.sh`: multi-line fragment values replacing one-line and
   multi-line target values, appended tables, inline tables kept verbatim,
   repeat merges, in-place rewrites and write errors.
