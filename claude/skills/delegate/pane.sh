@@ -52,6 +52,59 @@ CLAUDE_STANDARD="haiku sonnet opus"
 ROLES='impl|review|explore|fix'
 CLAUDE_WORKER_SETTINGS='{"enabledPlugins":{"superpowers@anthropic-plugin-directory":false},"env":{"CLAUDE_CODE_DISABLE_ADVISOR_TOOL":"1","HARNESS_LEAF":"1"}}'
 
+# Where a new worker goes: up to COLUMN_SLOTS beside the orchestrator, then
+# crew tabs of TAB_SLOTS each. Sets $pane; empty when the split or tab failed.
+COLUMN_SLOTS=2 TAB_SLOTS=4 CREW=crew
+# The worker starts in the caller's directory (a worktree, for SDD).
+split_pane() { # pane direction
+  herdr pane split --pane "$1" --direction "$2" --cwd "$PWD" --ratio 0.5 --no-focus --env "HARNESS_ROLE=$role" \
+    | jq -r '.result.pane_id // .result.pane.pane_id // empty'
+}
+# Prints "<pane> <direction>" for the largest of the candidate panes (a JSON
+# array) in the tab of $1; ties go to the first listed. Cells are about twice
+# as tall as wide, so a pane splits right only when it is over twice as wide.
+largest() { # pane-in-tab candidates
+  herdr pane layout --pane "$1" 2>/dev/null | jq -r --argjson ids "$2" \
+    '[.result.layout.panes[] | select(.pane_id | IN($ids[])) | {id: .pane_id, w: .rect.width, h: .rect.height}]
+     | sort_by(-(.w * .h)) | first | "\(.id) \(if .w > 2 * .h then "right" else "down" end)"' 2>/dev/null
+}
+split_largest() { # pane-in-tab candidates fallback-pane
+  local target id dir
+  # A read that failed after printing something is as unusable as none.
+  if target=$(largest "$1" "$2") && [ -n "$target" ]; then read -r id dir <<<"$target"; else id=$3 dir=down; fi
+  split_pane "$id" "$dir"
+}
+place() {
+  local cols last tabs panes i label tid ids unused=
+  cols=$(herdr agent list 2>/dev/null | jq -c --arg tab "${HERDR_TAB_ID:-}" --arg roles "$ROLES" \
+    '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-"))) | .pane_id]' 2>/dev/null) \
+    && [ -n "$cols" ] || cols='[]'
+  last=$(jq -r 'last // empty' <<<"$cols")
+  if [ -z "$last" ]; then pane=$(split_pane "$HERDR_PANE_ID" right); return; fi
+  if [ "$(jq length <<<"$cols")" -lt "$COLUMN_SLOTS" ]; then
+    pane=$(split_largest "$last" "$cols" "$last"); return
+  fi
+  # Column full. Any unreadable list below falls back to stacking the column.
+  if [ -z "${HERDR_WORKSPACE_ID:-}" ] \
+     || ! tabs=$(herdr tab list 2>/dev/null | jq -r --arg ws "$HERDR_WORKSPACE_ID" \
+          '.result.tabs[] | select(.tab_id | startswith($ws + ":")) | "\(.label)\t\(.tab_id)"' 2>/dev/null) \
+     || ! panes=$(herdr pane list 2>/dev/null | jq -ec '.result.panes' 2>/dev/null); then
+    pane=$(split_pane "$last" down); return
+  fi
+  # Crew, crew-2, crew-3...: the first tab with room, else the first unused label.
+  for (( i = 1; i <= $(grep -c . <<<"$tabs") + 1; i++ )); do
+    label=$CREW; [ "$i" = 1 ] || label=$CREW-$i
+    tid=$(awk -F'\t' -v l="$label" '$1 == l { print $2; exit }' <<<"$tabs")
+    if [ -z "$tid" ]; then unused=${unused:-$label}; continue; fi
+    ids=$(jq -c --arg t "$tid" '[.[] | select(.tab_id == $t) | .pane_id]' <<<"$panes")
+    if [ "$(jq length <<<"$ids")" -lt "$TAB_SLOTS" ]; then
+      pane=$(split_largest "$(jq -r '.[0]' <<<"$ids")" "$ids" "$last"); return
+    fi
+  done
+  pane=$(herdr tab create --label "$unused" --cwd "$PWD" --no-focus --env "HARNESS_ROLE=$role" \
+    | jq -r '.result.root_pane.pane_id // empty')
+}
+
 usage() { echo "usage: $0 claude|codex <alias> <effort> <role> <task> <brief> | --wait <pane> <report> [minutes] | --resume <pane> <message-file> [minutes]" >&2; exit 2; }
 # A report path no other round can share: an old path returns its old report.
 newreport() { local f; f=$(mktemp "$dir/$1-XXXXXXXX.json") && rm -f "$f" && echo "$f"; }
@@ -177,15 +230,7 @@ if [ -n "$kind" ]; then
   dir=${DELEGATE_HANDOFF_DIR:-/tmp/delegate}; mkdir -p "$dir"
   report=$(newreport "$role-$task") || exit 2
 
-  # The orchestrator gets at most one delegate column: the first delegate splits
-  # it right, later ones split the newest delegate down.
-  column=$(herdr agent list | jq -r --arg tab "${HERDR_TAB_ID:-}" --arg roles "$ROLES" \
-    '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-")))] | last | .pane_id // empty')
-  if [ -n "$column" ]; then split=(--pane "$column" --direction down)
-  else split=(--pane "$HERDR_PANE_ID" --direction right); fi
-  # The worker starts in the caller's directory (a worktree, for SDD).
-  pane=$(herdr pane split "${split[@]}" --cwd "$PWD" --ratio 0.5 --no-focus --env "HARNESS_ROLE=$role" \
-    | jq -r '.result.pane_id // .result.pane.pane_id // empty')
+  place
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
   if ! herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null; then
     if screen | grep -qiE 'do you trust|trust this (folder|directory)'; then

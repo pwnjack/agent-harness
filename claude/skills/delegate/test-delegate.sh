@@ -173,12 +173,20 @@ cat > "$tmp/bin/herdr" <<'STUB'
 S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
 case "$1 $2" in
-  "agent list") if [ "$SCEN" = column ]; then
+  "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
+                elif [ "$SCEN" = column ]; then
                   echo '{"result":{"agents":[{"tab_id":"t0","pane_id":"p9","name":"review-sol-x"},{"tab_id":"t9","pane_id":"p7","name":"impl-sol-y"},{"tab_id":"t0","pane_id":"p8","name":"reviewer"}]}}'
                 else echo '{"result":{"agents":[]}}'; fi ;;
   "pane split") printf '%s\n' "$@" > "$S/split"
                 [ "$SCEN" = splitfail ] && echo '{}' || echo '{"result":{"pane_id":"p1"}}' ;;
   "pane close") touch "$S/closed" ;;
+  # placement fixtures: agents, tabs, panes and layout files in the state dir
+  "tab list") [ -e "$S/tabfail" ] && exit 1; cat "$S/tabs" 2>/dev/null || echo '{"result":{"tabs":[]}}' ;;
+  "pane list") cat "$S/panes" 2>/dev/null || echo '{"result":{"panes":[]}}' ;;
+  "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1
+                ! [ -e "$S/layoutjunk" ] || echo '{not json'; ! [ -e "$S/layoutexit" ] || exit 1 ;;
+  "tab create") printf '%s\n' "$@" > "$S/tabcreate"
+                echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
   "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
@@ -203,7 +211,7 @@ case "$1 $2" in
     if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
-        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column) echo "$report" > "$(cat "$S/report")"; st=idle ;;
+        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
@@ -235,7 +243,7 @@ verdict() {
   [ "$sc" = wait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/w.json" > "$st/report"; }
   [ "$sc" = keepwait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/kw.json" > "$st/report"; }
   [ "$sc" = waitclose ] && { echo blocked > "$st/status"; echo "$tmp/handoff/wc.json" > "$st/report"; }
-  out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 \
+  out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
     DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="${CACHE:-$tmp/real.json}" CODEX_CONFIG="$tmp/config-ok.toml" \
     DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 DELEGATE_KEEP="${KEEP:-}" \
     "$here/pane.sh" "$@" 2>/dev/null); rc=$?
@@ -288,6 +296,78 @@ done
 verdict column      0 REPORT   yes
 if [ "$(tr '\n' ' ' < "$tmp/state-column/split")" = "pane split --pane p9 --direction down --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=impl " ]
 then echo "ok   pane column: splits the last delegate in this tab"; else echo "FAIL pane column: split $(cat "$tmp/state-column/split")"; fail=1; fi
+# Placement: two workers beside the orchestrator, then 2x2 crew tabs. Each case
+# writes its Herdr fixtures into the scenario's state dir, runs a launch, and
+# checks the recorded `pane split` or `tab create` arguments.
+fx_dir() { mkdir -p "$tmp/state-layout-$1"; echo "$tmp/state-layout-$1"; }
+fx_agents() { local d=$1; shift   # column workers, by pane
+  jq -n '{result:{agents:[$ARGS.positional[] | {tab_id:"t0", pane_id:., name:("review-sol-" + .)}]}}' --args "$@" > "$d/agents"; }
+fx_tabs() { local d=$1; shift     # "<tab_id>=<label>"
+  jq -n '{result:{tabs:[$ARGS.positional[] | split("=") | {tab_id:.[0], label:.[1]}]}}' --args "$@" > "$d/tabs"; }
+fx_panes() { local d=$1; shift    # "<tab_id>=<pane>"
+  jq -n '{result:{panes:[$ARGS.positional[] | split("=") | {pane_id:.[1], tab_id:.[0]}]}}' --args "$@" > "$d/panes"; }
+fx_layout() { local d=$1; shift   # "<pane>:<width>:<height>"
+  jq -n '{result:{layout:{tab_id:"x", splits:[], panes:[$ARGS.positional[] | split(":")
+    | {pane_id:.[0], rect:{x:0, y:0, width:(.[1] | tonumber), height:(.[2] | tonumber)}}]}}}' --args "$@" > "$d/layout"; }
+# launch <case> [role]: one worker launched against the case's fixtures
+launch() { verdict "layout-$1" 0 REPORT yes codex sol medium "${2:-impl}" "lay-$1" "$b"; }
+# recorded <label> <state-dir> <file> <want args, space-joined>
+recorded() {
+  local got; got=$(tr '\n' ' ' < "$2/$3" 2>/dev/null)
+  if [ "$got" = "$4" ]; then echo "ok   layout: $1"; else echo "FAIL layout: $1: $3 '$got' want '$4'"; fail=1; fi
+}
+common="--cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=impl "
+
+d=$(fx_dir first); launch first
+recorded "first worker splits the orchestrator right" "$d" split "pane split --pane p0 --direction right $common"
+
+d=$(fx_dir second); fx_agents "$d" p9; fx_layout "$d" p0:110:66 p9:109:66; launch second
+recorded "second worker splits the column pane down" "$d" split "pane split --pane p9 --direction down $common"
+
+d=$(fx_dir third); fx_agents "$d" p9 p8; fx_layout "$d" p0:110:66 p9:109:33 p8:109:33; launch third
+recorded "third worker opens the crew tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+if [ ! -e "$d/split" ] && grep -A1 -x -- --pane "$d/start" | tail -1 | grep -qx p2
+then echo "ok   layout: worker starts in the crew tab's root pane"; else echo "FAIL layout: crew root pane: start '$(cat "$d/start" 2>/dev/null)'"; fail=1; fi
+
+d=$(fx_dir crewone); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pc1
+fx_layout "$d" pc1:219:66; launch crewone
+recorded "crew with one pane splits right" "$d" split "pane split --pane pc1 --direction right $common"
+
+d=$(fx_dir crewgap); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pb wD:t2=pc wD:t2=pa
+fx_layout "$d" pb:109:33 pc:109:33 pa:109:66; launch crewgap
+recorded "crew gap refilled down" "$d" split "pane split --pane pa --direction down $common"
+
+d=$(fx_dir crewfull); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd
+fx_layout "$d" pa:109:33 pb:109:33 pc:109:33 pd:109:33; launch crewfull
+recorded "full crew opens crew-2" "$d" tabcreate "tab create --label crew-2 --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+
+d=$(fx_dir crew2); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew wD:t3=crew-2
+fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd wD:t3=pq1 wD:t3=pq2; fx_layout "$d" pq1:109:66 pq2:109:66; launch crew2
+recorded "crew-2 with room is used" "$d" split "pane split --pane pq1 --direction down $common"
+
+d=$(fx_dir otherws); fx_agents "$d" p9 p8; fx_tabs "$d" wE:t2=crew; fx_panes "$d" wE:t2=px; fx_layout "$d" px:219:66; launch otherws
+recorded "other workspace's crew ignored" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+
+d=$(fx_dir tabfail); fx_agents "$d" p9 p8; touch "$d/tabfail"; launch tabfail
+recorded "tab list failure falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+
+# a read that prints something usable and then fails is not trusted
+d=$(fx_dir layjunk); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pc1; fx_layout "$d" pc1:219:66
+touch "$d/layoutjunk"; launch layjunk
+recorded "layout followed by malformed data falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+d=$(fx_dir layexit); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pc1; fx_layout "$d" pc1:219:66
+touch "$d/layoutexit"; launch layexit
+recorded "layout from a failing herdr falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
+d=$(fx_dir agjunk); fx_agents "$d" p9 p8; touch "$d/agentsjunk"; launch agjunk
+recorded "agent list followed by malformed data counts no column" "$d" split "pane split --pane p0 --direction right $common"
+d=$(fx_dir agexit); fx_agents "$d" p9 p8; touch "$d/agentsexit"; launch agexit
+recorded "agent list from a failing herdr counts no column" "$d" split "pane split --pane p0 --direction right $common"
+
+# the role reaches every split and every tab create
+d=$(fx_dir rolesplit); launch rolesplit review
+recorded "role on every split" "$d" split "pane split --pane p0 --direction right --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=review "
+d=$(fx_dir roletab); fx_agents "$d" p9 p8; launch roletab fix
+recorded "role on every tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=fix "
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
