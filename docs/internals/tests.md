@@ -32,6 +32,9 @@ including Herdr, so they never install hooks or units on the host.
   is sandboxed; run the suite directly to include it.
 - `claude/hooks/test-agent-guard.sh`: the guard denies inside Herdr, is silent
   outside it, and is registered once after two settings merges.
+- `claude/hooks/test-pkill-guard.sh`: the guard denies `pkill -f` and `pgrep -f`
+  without a bracketed pattern, lets other commands and malformed input through
+  silently, and is registered once after two settings merges.
 - `claude/hooks/test-advisor-reset.sh`: startup registration, removal of
   `advisorModel`, worker bypass, settings mode and malformed settings.
 - `codex/test-codex-config.sh`: `memories = false`, preservation of unrelated

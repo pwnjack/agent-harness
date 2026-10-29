@@ -8,6 +8,7 @@
 | `claude/CLAUDE.global.md` | `~/.claude/CLAUDE.md` | symlink |
 | `claude/skills/*/` | `~/.claude/skills/*` | symlinks |
 | `claude/hooks/agent-guard.sh` | named in the settings | run in place |
+| `claude/hooks/pkill-guard.sh` | named in the settings | run in place on every Bash call |
 | `claude/hooks/advisor-reset.sh` | named in the settings | run in place at non-worker startup |
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |
@@ -43,7 +44,7 @@ lets Herdr install its own agent-state hooks, and sets the clone's
 
 The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
-vdirsyncer data), the Agent-tool guard hook, the advisor-reset hook, the
+vdirsyncer data), the Agent-tool guard hook, the `pkill -f` guard hook, the advisor-reset hook, the
 status line and the plugin list. `codex/statusline.toml` is the tracked slice
 of Codex's `config.toml`; `codex/features.toml` sets `memories = false`.
 
