@@ -173,11 +173,17 @@ cat > "$tmp/bin/herdr" <<'STUB'
 S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
 case "$1 $2" in
-  "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
+  "agent list") if [ "$SCEN" = lockblock ]; then echo $$ > "$S/blocked"; exec sleep 30; fi
+                if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
+                elif [ "$SCEN" = race ]; then   # agents started so far, one "pane<TAB>name" line each
+                  cat "$S/started" 2>/dev/null | jq -Rn '{result:{agents:[inputs | split("\t") | {tab_id:"t0", pane_id:.[0], name:.[1]}]}}'
                 elif [ "$SCEN" = column ]; then
                   echo '{"result":{"agents":[{"tab_id":"t0","pane_id":"p9","name":"review-sol-x"},{"tab_id":"t9","pane_id":"p7","name":"impl-sol-y"},{"tab_id":"t0","pane_id":"p8","name":"reviewer"}]}}'
                 else echo '{"result":{"agents":[]}}'; fi ;;
-  "pane split") printf '%s\n' "$@" > "$S/split"
+  "pane split") if [ "$SCEN" = race ]; then
+                  id=p$RANDOM$RANDOM; echo "split $4 $6 $id" >> "$S/placements"; echo "{\"result\":{\"pane_id\":\"$id\"}}"; exit 0
+                fi
+                printf '%s\n' "$@" > "$S/split"
                 [ "$SCEN" = splitfail ] && echo '{}' || echo '{"result":{"pane_id":"p1"}}' ;;
   "pane close") touch "$S/closed" ;;
   # placement fixtures: agents, tabs, panes and layout files in the state dir
@@ -185,9 +191,13 @@ case "$1 $2" in
   "pane list") cat "$S/panes" 2>/dev/null || echo '{"result":{"panes":[]}}' ;;
   "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1
                 ! [ -e "$S/layoutjunk" ] || echo '{not json'; ! [ -e "$S/layoutexit" ] || exit 1 ;;
-  "tab create") printf '%s\n' "$@" > "$S/tabcreate"
+  "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $4" >> "$S/placements"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
-  "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
+  "agent start") printf '%s\n' "$@" > "$S/start"
+                [ "$SCEN" != race ] || { sleep 0.3; printf '%s\t%s\n' "$7" "$3" >> "$S/started"; }
+                # a long-lived child, as a started agent might leave behind
+                [ "$SCEN" != lockchild ] || { sleep 5 >/dev/null 2>&1 & }
+                [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
                   startfail) echo "error: agent crashed" > "$S/screen"; exit 1 ;;
@@ -198,7 +208,7 @@ case "$1 $2" in
     n=$(( $(cat "$S/prompts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$S/prompts"; echo "$4" > "$S/msg"
     rep=${4##*write your report to }; echo "${rep%% as JSON*}" > "$S/report"
     case "$SCEN" in
-      nostart) ;;
+      nostart|race) ;;
       hooks|hooksresume) [ "$n" = 1 ] && echo "Hooks — 1 hook needs review" > "$S/screen"; echo working > "$S/status" ;;
       earlyblock) echo blocked > "$S/status" ;;
       idlequota) echo idle > "$S/status"; echo "■ You've hit your usage limit. Try again later." > "$S/screen" ;;
@@ -211,7 +221,7 @@ case "$1 $2" in
     if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
-        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
+        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
@@ -368,6 +378,89 @@ d=$(fx_dir rolesplit); launch rolesplit review
 recorded "role on every split" "$d" split "pane split --pane p0 --direction right --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=review "
 d=$(fx_dir roletab); fx_agents "$d" p9 p8; launch roletab fix
 recorded "role on every tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=fix "
+# The placement lock: launches started together are placed one after another.
+# "race" has the stub list the agents started so far and take a moment to
+# start one, so a launch that counts the column before the previous one has
+# started sees it empty.
+st=$tmp/state-race; mkdir -p "$st" "$tmp/handoff-race"
+for t in lk1 lk2 lk3; do
+  env SCEN=race STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+    DELEGATE_HANDOFF_DIR="$tmp/handoff-race" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+    DELEGATE_POLL=0.1 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
+done
+wait
+rid=$(awk '$2 == "p0" && $3 == "right" { print $4 }' "$st/placements" 2>/dev/null)
+if [ "$(wc -l < "$st/placements" 2>/dev/null)" -eq 3 ] && [ "$(grep -c '^split p0 ' "$st/placements")" -eq 1 ] \
+   && [ -n "$rid" ] && [ "$(grep -c "^split $rid down " "$st/placements")" -eq 1 ] \
+   && [ "$(grep -c '^tab crew$' "$st/placements")" -eq 1 ]
+then echo "ok   lock: simultaneous launches stack in order"
+else echo "FAIL lock: simultaneous launches placed as: $(paste -sd'|' "$st/placements" 2>/dev/null)"; fail=1; fi
+if flock -n "$tmp/handoff-race/.place.lock" true
+then echo "ok   lock: three simultaneous launches leave no lock held"; else echo "FAIL lock: held after simultaneous launches"; fail=1; fi
+
+lockfile=$tmp/handoff/.place.lock
+mkdir -p "$tmp/handoff"
+# lockrun <scenario>: one launch against the shared handoff dir; prints its output.
+lockrun() {
+  mkdir -p "$tmp/state-$1"
+  env SCEN="$1" STATE="$tmp/state-$1" PATH="${LPATH:-$tmp/bin:$PATH}" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+    DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+    DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 "$here/pane.sh" codex sol medium impl "t-$1" "$b" 2>/dev/null
+}
+# lockhold: a background process holding the lock until killed; sets $holder.
+lockhold() {
+  rm -f "$tmp/held"
+  ( exec 8>>"$lockfile"; flock 8 && : > "$tmp/held"; exec sleep 30 ) & holder=$!
+  until [ -e "$tmp/held" ]; do sleep 0.05; done
+}
+# lockfree: whether the lock can be taken at once
+lockfree() { flock -n "$lockfile" true; }
+
+# A holder killed without releasing: the kernel frees the lock at once.
+lockhold; kill "$holder"; wait "$holder" 2>/dev/null
+t0=$SECONDS; out=$(DELEGATE_LOCK_WAIT=30 lockrun lockkilled)
+if [ "${out%% *}" = REPORT ] && [ $(( SECONDS - t0 )) -lt 10 ] && ! grep -q 'placement lock' <<<"$out"
+then echo "ok   lock: a lock held by a killed process is free at once"; else echo "FAIL lock: killed holder delayed the launch (${out%% *}, $(( SECONDS - t0 ))s)"; fail=1; fi
+
+# A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then
+# goes ahead without the lock and says so.
+lockhold
+t0=$SECONDS; out=$(DELEGATE_LOCK_WAIT=1 lockrun locknote)
+if [ "${out%% *}" = REPORT ] && [ $(( SECONDS - t0 )) -ge 1 ] && [ $(( SECONDS - t0 )) -lt 10 ] \
+   && grep -q '^placement lock not free after 1s; launched without it$' <<<"$out" && ! lockfree
+then echo "ok   lock: a lock that never frees times out and the launch proceeds"
+else echo "FAIL lock: timeout (${out%% *}, waited $(( SECONDS - t0 ))s, output: $(tail -n +2 <<<"$out" | head -n 2 | paste -sd'|' -))"; fail=1; fi
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+
+# Without flock on PATH the launch proceeds, silently.
+farm=$tmp/noflock; mkdir -p "$farm"
+for f in /usr/bin/* /bin/*; do [ -L "$farm/${f##*/}" ] || [ "${f##*/}" = flock ] || ln -s "$f" "$farm/${f##*/}"; done
+out=$(LPATH="$tmp/bin:$farm" lockrun locknoflock)
+if [ "${out%% *}" = REPORT ] && ! grep -q 'placement lock' <<<"$out" && ! [ -e "$farm/flock" ]
+then echo "ok   lock: no flock on PATH: the launch proceeds"; else echo "FAIL lock: launch without flock gave '${out%% *}'"; fail=1; fi
+
+# Released on every path: the next launch could take the lock at once.
+verdict lockfree 0 REPORT yes
+lockfree && echo "ok   lock: released after launch" || { echo "FAIL lock: still held after a launch"; fail=1; }
+verdict nostart 7 NOSTART no
+lockfree && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: still held after NOSTART"; fail=1; }
+verdict startfail 7 NOSTART yes
+lockfree && echo "ok   lock: released after a failed start" || { echo "FAIL lock: still held after a failed start"; fail=1; }
+# Killed while a placement read blocks: no process of the placement (its
+# substitutions, jq, grep) may be left holding the lock.
+mkdir -p "$tmp/state-lockblock"; rm -f "$tmp/state-lockblock/blocked"
+env SCEN=lockblock STATE="$tmp/state-lockblock" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+  DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+  "$here/pane.sh" codex sol medium impl t-lockblock "$b" >/dev/null 2>&1 & launcher=$!
+for _ in $(seq 100); do [ -s "$tmp/state-lockblock/blocked" ] && break; sleep 0.05; done
+kill -9 "$launcher" 2>/dev/null; wait "$launcher" 2>/dev/null
+if lockfree; then echo "ok   lock: a launch killed mid-placement leaves no process holding the lock"
+else echo "FAIL lock: lock still held after the launcher was killed during a blocked placement read"; fail=1; fi
+kill "$(cat "$tmp/state-lockblock/blocked" 2>/dev/null)" 2>/dev/null; wait 2>/dev/null
+
+# A child the started agent leaves behind must not keep the lock.
+out=$(lockrun lockchild)
+lockfree && echo "ok   lock: a long-lived child of agent start does not keep the lock" || { echo "FAIL lock: held by a child of agent start (${out%% *})"; fail=1; }
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi

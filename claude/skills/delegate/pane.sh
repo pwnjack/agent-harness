@@ -39,6 +39,13 @@
 # --resume sends the message plus the report request with a fresh report path
 # (an old path would return the previous report at once) and keeps the pane.
 #
+# Launches started together are placed one after another: flock on
+# $dir/.place.lock is held from counting the column until `herdr agent start`
+# returns, because a worker shows in `herdr agent list` only once started.
+# The kernel releases it when the holder exits or dies. After DELEGATE_LOCK_WAIT
+# seconds (default 90), or with no flock on PATH, the launch goes ahead without
+# it. --wait and --resume never lock. Needs util-linux flock (Linux only).
+#
 # Claude workers start with Superpowers and the advisor off. HARNESS_LEAF
 # also keeps their SessionStart hook from resetting the user's advisor choice.
 # Codex workers follow the leaf contract in AGENTS.md.
@@ -104,6 +111,15 @@ place() {
   pane=$(herdr tab create --label "$unused" --cwd "$PWD" --no-focus --env "HARNESS_ROLE=$role" \
     | jq -r '.result.root_pane.pane_id // empty')
 }
+
+# The placement lock is held on fd 9; closing it releases the lock.
+place_lock() {
+  command -v flock >/dev/null || return 0
+  { exec 9>>"$dir/.place.lock"; } 2>/dev/null || return 0
+  flock -w "${DELEGATE_LOCK_WAIT:-90}" 9 || {
+    exec 9>&-; note="placement lock not free after ${DELEGATE_LOCK_WAIT:-90}s; launched without it"; }
+}
+unlock() { exec 9>&-; }
 
 usage() { echo "usage: $0 claude|codex <alias> <effort> <role> <task> <brief> | --wait <pane> <report> [minutes] | --resume <pane> <message-file> [minutes]" >&2; exit 2; }
 # A report path no other round can share: an old path returns its old report.
@@ -230,9 +246,18 @@ if [ -n "$kind" ]; then
   dir=${DELEGATE_HANDOFF_DIR:-/tmp/delegate}; mkdir -p "$dir"
   report=$(newreport "$role-$task") || exit 2
 
-  place
+  # The lock must die with this process, so nothing that outlives it may hold
+  # fd 9: placement runs in one subshell that closes it first (every
+  # substitution, pipeline and tool inside inherits it closed), and the start
+  # call below closes it for herdr.
+  herdr() { command herdr "$@" 9>&-; }
+  place_lock
+  pane=$(exec 9>&-; place; echo "$pane")
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
-  if ! herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null; then
+  started=0
+  herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null && started=1
+  unlock
+  if [ "$started" = 0 ]; then
     if screen | grep -qiE 'do you trust|trust this (folder|directory)'; then
       note="first-run folder trust prompt in $pane: answer it there, then close the pane and rerun (the brief was not sent)"
       finish BLOCKED 3

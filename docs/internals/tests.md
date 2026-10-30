@@ -26,7 +26,11 @@ including Herdr, so they never install hooks or units on the host.
   and `--resume` keeping the pane, the trust-prompt BLOCKED, the worker
   settings that disable Superpowers and the advisor, and the pane placement
   (column of two, `crew` tabs of four, other workspaces ignored, fallback when
-  `tab list` fails, role on every split and tab).
+  `tab list` fails, role on every split and tab), and the placement lock
+  (simultaneous launches stack in order, a killed holder frees it at once, a
+  stuck lock times out with a note, no `flock` on PATH, release on every path
+  a long-lived child of `agent start` does not keep it, and a launch killed
+  during a blocked placement read leaves nothing holding it).
 - `claude/skills/delegate/test-sdd-brief.sh`: every brief kind is filled and
   blind, bad ranges and changed templates are refused, hostile titles and
   file names stay literal; against stand-in templates. Under `./test.sh` the

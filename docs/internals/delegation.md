@@ -96,3 +96,12 @@ reset hook leave the user's choice alone.
   label with `herdr tab create` and starts the worker in its root pane. A
   failing Herdr read falls back to splitting the last column pane down; a
   failed split or tab create is NOSTART.
+- Launches started together are placed one at a time: `pane.sh` takes
+  `flock` on `.place.lock` in the handoff dir (fd 9) from just before it
+  counts the column until `herdr agent start` returns, and nothing placement
+  starts (its subshell, `jq`, `herdr`) inherits the fd, so killing the launch
+  frees the lock at once. After
+  `DELEGATE_LOCK_WAIT` seconds (default 90) the launch goes ahead without it
+  and prints a note; with no `flock` on PATH it goes ahead silently.
+  `--wait` and `--resume` never lock. `flock` is util-linux, so this is
+  Linux only, like the rest of `pane.sh`.
