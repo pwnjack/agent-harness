@@ -118,26 +118,39 @@ unlock() {
   [ "$(cat "$lock/pid" 2>/dev/null)" != "$$" ] || rm -rf "$lock"
   lock=
 }
+# Removes directory $1 if its pid file still reads $2 (empty: still has none)
+# and that process is dead, so a lock retaken since $2 was read is left alone.
+clear_stale() {
+  local now
+  [ -n "$2" ] || sleep 0.1   # let a lock made just now write its pid
+  now=$(cat "$1/pid" 2>/dev/null)
+  if [ "$now" = "$2" ] && { [ -z "$2" ] || ! kill -0 "$2" 2>/dev/null; }; then rm -rf "$1"; fi
+}
 place_lock() {
-  local l=$dir/.place.lock tries=$(( ${DELEGATE_LOCK_WAIT:-90} * 2 )) holder now nopid=0 busy=0
+  local l=$dir/.place.lock t=$dir/.place.lock.takeover tries=$(( ${DELEGATE_LOCK_WAIT:-90} * 2 )) holder owner nopid=0 tkno=0
   while [ "$tries" -gt 0 ]; do
     if mkdir "$l" 2>/dev/null; then echo "$$" > "$l/pid"; lock=$l; trap unlock EXIT; return; fi
     holder=$(cat "$l/pid" 2>/dev/null)
     if [ -z "$holder" ]; then nopid=$(( nopid + 1 )); else nopid=0; fi
     # Dead holder, or a lock that never got its pid file. Clearing it is a
-    # compare-and-remove under its own mutex: another waiter may have cleared
-    # it and a live holder retaken it since this one looked.
+    # compare-and-remove under a takeover mutex that records its owner: another
+    # waiter may have cleared the lock and a live holder retaken it since this
+    # one looked. A live owner of the mutex is never revoked, paused or not.
     if { [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; } || [ "$nopid" -ge 3 ]; then
-      if mkdir "$l.takeover" 2>/dev/null; then
-        busy=0
-        [ -n "$holder" ] || sleep 0.1   # let a lock taken just now write its pid
-        now=$(cat "$l/pid" 2>/dev/null)
-        if [ "$now" = "$holder" ] && { [ -z "$holder" ] || ! kill -0 "$holder" 2>/dev/null; }; then rm -rf "$l"; fi
-        rm -rf "$l.takeover"; nopid=0
+      if mkdir "$t" 2>/dev/null; then
+        echo "$$" > "$t/pid" 2>/dev/null
+        if [ "$(cat "$t/pid" 2>/dev/null)" = "$$" ]; then
+          clear_stale "$l" "$holder"
+          [ "$(cat "$t/pid" 2>/dev/null)" != "$$" ] || rm -rf "$t"
+        fi
+        nopid=0; tkno=0
       else
-        # Held for milliseconds; one seen for ~3s belongs to a waiter that died.
-        busy=$(( busy + 1 ))
-        [ "$busy" -lt 6 ] || { rm -rf "$l.takeover"; busy=0; }
+        # The mutex is itself cleared only when its owner is dead or never wrote a pid.
+        owner=$(cat "$t/pid" 2>/dev/null)
+        if [ -z "$owner" ]; then tkno=$(( tkno + 1 )); else tkno=0; fi
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } || [ "$tkno" -ge 3 ]; then
+          clear_stale "$t" "$owner"; tkno=0
+        fi
       fi
     fi
     tries=$(( tries - 1 )); sleep 0.5

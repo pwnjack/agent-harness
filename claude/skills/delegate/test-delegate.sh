@@ -433,11 +433,20 @@ else echo "FAIL lock: holders interleaved or missing: $(paste -sd'|' "$st/log" 2
 [ ! -e "$hd/.place.lock" ] && [ ! -e "$hd/.place.lock.takeover" ] && echo "ok   lock: racing waiters leave no lock behind" \
   || { echo "FAIL lock: lock or takeover left behind after racing waiters"; fail=1; }
 
-# A takeover mutex left by a waiter that died is cleared after a few seconds.
-rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"
+# A takeover mutex whose owner died is cleared.
+rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"; echo "$dead" > "$lockdir.takeover/pid"
 t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
 if [ ! -e "$lockdir" ] && [ ! -e "$lockdir.takeover" ] && [ $(( SECONDS - t0 )) -lt 15 ]
-then echo "ok   lock: an abandoned takeover mutex is cleared"; else echo "FAIL lock: abandoned takeover mutex kept or waited out"; rm -rf "$lockdir" "$lockdir.takeover"; fail=1; fi
+then echo "ok   lock: a takeover mutex left by a dead owner is cleared"; else echo "FAIL lock: dead owner's takeover mutex kept or waited out"; rm -rf "$lockdir" "$lockdir.takeover"; fail=1; fi
+# One whose owner is alive is never revoked, however long it is paused: the
+# launch waits DELEGATE_LOCK_WAIT, goes ahead unlocked, and leaves it alone.
+sleep 30 & owner=$!
+rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"; echo "$owner" > "$lockdir.takeover/pid"
+t0=$SECONDS; DELEGATE_LOCK_WAIT=5 verdict locktimeout 0 REPORT yes
+if [ "$(cat "$lockdir.takeover/pid" 2>/dev/null)" = "$owner" ] && [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$dead" ] && [ $(( SECONDS - t0 )) -ge 5 ]
+then echo "ok   lock: a takeover mutex held by a live owner is not cleared"
+else echo "FAIL lock: live owner's takeover mutex cleared or not waited on (takeover pid '$(cat "$lockdir.takeover/pid" 2>/dev/null)')"; fail=1; fi
+kill "$owner" 2>/dev/null; wait "$owner" 2>/dev/null; rm -rf "$lockdir" "$lockdir.takeover"
 
 # A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then goes ahead.
 sleep 30 & holder=$!
