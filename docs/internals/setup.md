@@ -79,16 +79,21 @@ bars with their reset times (12 h or 24 h, following `options/clock` when the
 dotfiles provide it). Codex shows the same fields from `codex/statusline.toml`,
 with `terminal_title` set to the spinner and the thread title.
 
-`herdr/sidebar.toml` gives Herdr's agent sidebar a 34-column Card layout of
-three rows per agent: state icon, `$repo` and `$role`; `$model` and `$effort`;
-the stripped terminal title. Four tokens fill it, reported under the source
-`harness:sidebar` by `herdr/sidebar-report.sh <cwd> <model> <effort>`:
+`herdr/sidebar.toml` gives Herdr's agent sidebar a 34-column layout of two
+rows per agent, with no gap between agents, no meter and no session title:
+the state icon, `$model` (bold) and `$effort`; then `$repo` and a dim `$role`.
+Four tokens fill it, reported under the source `harness:sidebar` by
+`herdr/sidebar-report.sh <cwd> <model> <effort> <family>`, where family is
+`claude` or `codex`:
 
 - `repo`: the main repository's name, also for a linked worktree.
-- `role`: from `HARNESS_ROLE`, which `pane.sh` sets on workers (`impl`,
-  `review`, `explore`, `fix`); any other pane is `orchestrator`.
-- `model`: the model name the caller passes.
-- `effort`: a five-cell meter and the level.
+- `role`: from `HARNESS_ROLE`, which `pane.sh` sets on workers; `impl`,
+  `review`, `explore` and `fix` are shown as given, any other pane is `lead`.
+- `model`: the family icon, a space and the model name the caller passes. The
+  icons are Nerd Font codepoints (Claude U+EC82, Codex U+EC81), so a font
+  without Nerd Font glyphs shows a box. Another family gets the name alone.
+- `effort`: the bare level (`low`, `medium`, `high`, `xhigh`, `max`),
+  coloured as in the Claude status line.
 
 `claude/statusline.sh` calls the reporter on each render with the Claude model
 and effort. `codex/hooks/sidebar.sh` calls it on `SessionStart`,
@@ -99,7 +104,7 @@ fails its caller.
 `herdr/apply-config.sh` checks the merged file with `herdr config check`,
 restores it if Herdr rejects it, and reloads a running server. It warns when
 `ui.sidebar.agents.rows_by_agent.claude` or `.codex` is set, because a
-per-agent row set replaces the Card layout for that agent. Codex runs a new
+per-agent row set replaces the harness layout for that agent. Codex runs a new
 hook only after the user trusts it once in an interactive session.
 
 ## Removing the harness

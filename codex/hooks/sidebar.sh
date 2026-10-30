@@ -34,5 +34,5 @@ EOF2
 fi
 
 HARNESS_SIDEBAR_SYNC=1 bash "$(dirname "${BASH_SOURCE[0]}")/../../herdr/sidebar-report.sh" \
-  "$cwd" "$model" "$effort" >/dev/null 2>&1 || true
+  "$cwd" "$model" "$effort" codex >/dev/null 2>&1 || true
 exit 0

@@ -2,9 +2,8 @@
 sidebar_width = 34
 
 [ui.sidebar.agents]
-row_gap = 1
+row_gap = 0
 rows = [
-  ["state_icon", { token = "$repo", bold = true }, { token = "$role", rules = [{ equals = "orchestrator", fg = "#cdd6f4", bold = true }, { equals = "implementer", fg = "#89b4fa" }, { equals = "reviewer", fg = "#f5c2e7" }, { equals = "explorer", fg = "#94e2d5" }, { equals = "fixer", fg = "#b4befe" }] }],
-  [{ token = "$model", bold = true }, { token = "$effort", rules = [{ contains = "xhigh", fg = "#d75f5f" }, { contains = "max", fg = "#af87d7" }, { contains = "high", fg = "#d7875f" }, { contains = "medium", fg = "#d7af5f" }, { contains = "low", fg = "#87af87" }] }],
-  [{ token = "terminal_title_stripped", dim = true }],
+  ["state_icon", { token = "$model", bold = true }, { token = "$effort", rules = [{ equals = "low", fg = "#87af87" }, { equals = "medium", fg = "#d7af5f" }, { equals = "high", fg = "#d7875f" }, { equals = "xhigh", fg = "#d75f5f" }, { equals = "max", fg = "#af87d7" }] }],
+  ["$repo", { token = "$role", dim = true }],
 ]
