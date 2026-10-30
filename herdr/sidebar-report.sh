@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Report repo, role, model and effort for this pane to the Herdr sidebar.
-# Usage: sidebar-report.sh <cwd> <model> <effort>. Always silent, exit 0.
+# Usage: sidebar-report.sh <cwd> <model> <effort> <family>, family claude or
+# codex. Always silent, exit 0.
 # HARNESS_SIDEBAR_SYNC=1 waits for the herdr call; by default it is detached.
 set -euo pipefail
 
-cwd=${1:-} model=${2:-} effort=${3:-}
+cwd=${1:-} model=${2:-} effort=${3:-} family=${4:-}
 [ -n "${HERDR_PANE_ID:-}" ] || exit 0
 command -v herdr >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
@@ -21,27 +22,30 @@ if common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/d
 fi
 [ -n "$repo" ] || repo=$(basename -- "$cwd" 2>/dev/null) || repo=''
 
+# Nerd Font codepoints (cod-claude U+EC82, cod-openai U+EC81), as UTF-8 bytes.
+case $family in
+  claude) icon=$'\xee\xb2\x82' ;;
+  codex) icon=$'\xee\xb2\x81' ;;
+  *) icon='' ;;
+esac
+
 case ${HARNESS_ROLE:-} in
-  impl) role=implementer ;;
-  review) role=reviewer ;;
-  explore) role=explorer ;;
-  fix) role=fixer ;;
-  *) role=orchestrator ;;
+  impl|review|explore|fix) role=$HARNESS_ROLE ;;
+  *) role=lead ;;
 esac
 
 case $effort in
-  low) meter='▰▱▱▱▱' ;;
-  medium) meter='▰▰▱▱▱' ;;
-  high) meter='▰▰▰▱▱' ;;
-  xhigh) meter='▰▰▰▰▱' ;;
-  max) meter='▰▰▰▰▰' ;;
-  *) meter='' ;;
+  low|medium|high|xhigh|max) ;;
+  *) effort='' ;;
 esac
 
 # Reports are patches, so every token is either set or cleared.
 args=(--token "repo=$repo" --token "role=$role")
-if [ -n "$model" ]; then args+=(--token "model=${model:0:80}"); else args+=(--clear-token model); fi
-if [ -n "$meter" ]; then args+=(--token "effort=$meter $effort"); else args+=(--clear-token effort); fi
+if [ -n "$model" ]; then
+  if [ -n "$icon" ]; then model="$icon $model"; fi
+  args+=(--token "model=${model:0:80}")
+else args+=(--clear-token model); fi
+if [ -n "$effort" ]; then args+=(--token "effort=$effort"); else args+=(--clear-token effort); fi
 
 # One cache per Herdr socket and pane; an identical report is resent only
 # once the cache is over a minute old, to recover from a server restart.

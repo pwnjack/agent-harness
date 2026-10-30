@@ -46,7 +46,7 @@ reported=$(bash "$statusline" <<<"$input")
 if [ -n "$plain" ] && [ "$plain" = "$reported" ]; then ok "status line unchanged with reporting"
 else no "status line unchanged with reporting"; fi
 
-if wait_for 'model=Opus 5.5|--token|effort=▰▰▰▱▱ high' && grep -qF -- "repo=proj" "$tmp/calls"; then
+if wait_for $'model=\xee\xb2\x82 Opus 5.5|--token|effort=high' && grep -qF -- "repo=proj" "$tmp/calls"; then
   ok "reporter called with cwd, model, effort"
 else no "reporter called with cwd, model, effort"; cat "$tmp/calls"; fi
 

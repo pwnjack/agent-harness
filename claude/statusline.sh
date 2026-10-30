@@ -25,7 +25,7 @@ IFS=$'\x1f' read -r model effort cwd used total win fiveh fiveh_at week week_at 
 
 # Feed the herdr sidebar; the reporter detaches its own Herdr call.
 reporter="$(dirname "${BASH_SOURCE[0]}")/../herdr/sidebar-report.sh"
-bash "$reporter" "$cwd" "$model" "$effort" </dev/null >/dev/null 2>&1 || true
+bash "$reporter" "$cwd" "$model" "$effort" claude </dev/null >/dev/null 2>&1 || true
 
 fmt_tok() { awk -v n="$1" 'BEGIN{if(n>=1000000)printf"%.1fM",n/1000000;else if(n>=1000)printf"%.0fk",n/1000;else printf"%d",n}'; }
 # seconds until an epoch timestamp, as 2d3h / 2h14m / 9m

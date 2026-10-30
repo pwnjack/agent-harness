@@ -36,7 +36,8 @@ run_hook() { printf '%s' "$1" | bash "$hook" > "$tmp/out" 2>&1; }
 # payload <model> <transcript>
 payload() { jq -cn --arg m "$1" --arg c "$tmp/my repo" --arg t "$2" \
   '{session_id:"s",transcript_path:$t,cwd:$c,hook_event_name:"SessionStart",model:$m}'; }
-prefix='pane|report-metadata|w1:p1|--source|harness:sidebar|--seq|N|--token|repo=my repo|--token|role=orchestrator'
+prefix='pane|report-metadata|w1:p1|--source|harness:sidebar|--seq|N|--token|repo=my repo|--token|role=lead'
+icon=$'\xee\xb2\x81' # Nerd Font cod-openai, the Codex family icon
 
 git init -q -- "$tmp/my repo"
 transcript="$tmp/my repo/rollout.jsonl"
@@ -49,19 +50,19 @@ transcript="$tmp/my repo/rollout.jsonl"
 
 fresh
 if run_hook "$(payload gpt-6.1-sol "$transcript")" && [ ! -s "$tmp/out" ] \
-   && [ "$(last_call)" = "$prefix|--token|model=Sol 6.1|--token|effort=▰▰▱▱▱ medium" ]; then
+   && [ "$(last_call)" = "$prefix|--token|model=$icon Sol 6.1|--token|effort=medium" ]; then
   ok "slug formatted"
 else no "slug formatted"; last_call; fi
 
 fresh
 if run_hook "$(payload some-model "$transcript")" \
-   && [ "$(last_call)" = "$prefix|--token|model=some-model|--token|effort=▰▰▱▱▱ medium" ]; then
+   && [ "$(last_call)" = "$prefix|--token|model=$icon some-model|--token|effort=medium" ]; then
   ok "unknown slug passed through"
 else no "unknown slug passed through"; last_call; fi
 
 fresh
 if run_hook "$(payload gpt-6.1-sol "$transcript")" \
-   && [ "$(last_call)" = "$prefix|--token|model=Sol 6.1|--token|effort=▰▰▱▱▱ medium" ]; then
+   && [ "$(last_call)" = "$prefix|--token|model=$icon Sol 6.1|--token|effort=medium" ]; then
   ok "effort from last turn_context"
 else no "effort from last turn_context"; last_call; fi
 
@@ -72,13 +73,13 @@ half="$tmp/my repo/half.jsonl"
 } > "$half"
 fresh
 if run_hook "$(payload gpt-6.1-sol "$half")" \
-   && [ "$(last_call)" = "$prefix|--token|model=Sol 6.1|--token|effort=▰▱▱▱▱ low" ]; then
+   && [ "$(last_call)" = "$prefix|--token|model=$icon Sol 6.1|--token|effort=low" ]; then
   ok "half-written last line ignored"
 else no "half-written last line ignored"; last_call; fi
 
 fresh
 if run_hook "$(payload gpt-6.1-sol "$tmp/missing.jsonl")" \
-   && [ "$(last_call)" = "$prefix|--token|model=Sol 6.1|--clear-token|effort" ]; then
+   && [ "$(last_call)" = "$prefix|--token|model=$icon Sol 6.1|--clear-token|effort" ]; then
   ok "no transcript: effort cleared"
 else no "no transcript: effort cleared"; last_call; fi
 
