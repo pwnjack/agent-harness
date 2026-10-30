@@ -96,3 +96,6 @@ reset hook leave the user's choice alone.
   label with `herdr tab create` and starts the worker in its root pane. A
   failing Herdr read falls back to splitting the last column pane down; a
   failed split or tab create is NOSTART.
+- Launches started together are placed one at a time under a `.place.lock`
+  directory in the handoff dir (stale locks are taken over; the launch goes
+  ahead unlocked after `DELEGATE_LOCK_WAIT` seconds, default 90).

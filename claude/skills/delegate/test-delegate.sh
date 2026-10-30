@@ -174,10 +174,15 @@ S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
 case "$1 $2" in
   "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
+                elif [ "$SCEN" = race ]; then   # agents started so far, one "pane<TAB>name" line each
+                  cat "$S/started" 2>/dev/null | jq -Rn '{result:{agents:[inputs | split("\t") | {tab_id:"t0", pane_id:.[0], name:.[1]}]}}'
                 elif [ "$SCEN" = column ]; then
                   echo '{"result":{"agents":[{"tab_id":"t0","pane_id":"p9","name":"review-sol-x"},{"tab_id":"t9","pane_id":"p7","name":"impl-sol-y"},{"tab_id":"t0","pane_id":"p8","name":"reviewer"}]}}'
                 else echo '{"result":{"agents":[]}}'; fi ;;
-  "pane split") printf '%s\n' "$@" > "$S/split"
+  "pane split") if [ "$SCEN" = race ]; then
+                  id=p$RANDOM$RANDOM; echo "split $4 $6 $id" >> "$S/placements"; echo "{\"result\":{\"pane_id\":\"$id\"}}"; exit 0
+                fi
+                printf '%s\n' "$@" > "$S/split"
                 [ "$SCEN" = splitfail ] && echo '{}' || echo '{"result":{"pane_id":"p1"}}' ;;
   "pane close") touch "$S/closed" ;;
   # placement fixtures: agents, tabs, panes and layout files in the state dir
@@ -185,9 +190,11 @@ case "$1 $2" in
   "pane list") cat "$S/panes" 2>/dev/null || echo '{"result":{"panes":[]}}' ;;
   "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1
                 ! [ -e "$S/layoutjunk" ] || echo '{not json'; ! [ -e "$S/layoutexit" ] || exit 1 ;;
-  "tab create") printf '%s\n' "$@" > "$S/tabcreate"
+  "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $4" >> "$S/placements"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
-  "agent start") printf '%s\n' "$@" > "$S/start"; [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
+  "agent start") printf '%s\n' "$@" > "$S/start"
+                [ "$SCEN" != race ] || { sleep 0.3; printf '%s\t%s\n' "$7" "$3" >> "$S/started"; }
+                [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
                   startfail) echo "error: agent crashed" > "$S/screen"; exit 1 ;;
@@ -198,7 +205,7 @@ case "$1 $2" in
     n=$(( $(cat "$S/prompts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$S/prompts"; echo "$4" > "$S/msg"
     rep=${4##*write your report to }; echo "${rep%% as JSON*}" > "$S/report"
     case "$SCEN" in
-      nostart) ;;
+      nostart|race) ;;
       hooks|hooksresume) [ "$n" = 1 ] && echo "Hooks — 1 hook needs review" > "$S/screen"; echo working > "$S/status" ;;
       earlyblock) echo blocked > "$S/status" ;;
       idlequota) echo idle > "$S/status"; echo "■ You've hit your usage limit. Try again later." > "$S/screen" ;;
@@ -211,7 +218,7 @@ case "$1 $2" in
     if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
-        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
+        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
@@ -368,6 +375,55 @@ d=$(fx_dir rolesplit); launch rolesplit review
 recorded "role on every split" "$d" split "pane split --pane p0 --direction right --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=review "
 d=$(fx_dir roletab); fx_agents "$d" p9 p8; launch roletab fix
 recorded "role on every tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=fix "
+# The placement lock: launches started together are placed one after another.
+# "race" has the stub list the agents started so far and take a moment to
+# start one, so a launch that counts the column before the previous one has
+# started sees it empty.
+st=$tmp/state-race; mkdir -p "$st" "$tmp/handoff-race"
+for t in lk1 lk2 lk3; do
+  env SCEN=race STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+    DELEGATE_HANDOFF_DIR="$tmp/handoff-race" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+    DELEGATE_POLL=0.1 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
+done
+wait
+rid=$(awk '$2 == "p0" && $3 == "right" { print $4 }' "$st/placements" 2>/dev/null)
+if [ "$(wc -l < "$st/placements" 2>/dev/null)" -eq 3 ] && [ "$(grep -c '^split p0 ' "$st/placements")" -eq 1 ] \
+   && [ -n "$rid" ] && [ "$(grep -c "^split $rid down " "$st/placements")" -eq 1 ] \
+   && [ "$(grep -c '^tab crew$' "$st/placements")" -eq 1 ]
+then echo "ok   lock: simultaneous launches stack in order"
+else echo "FAIL lock: simultaneous launches placed as: $(paste -sd'|' "$st/placements" 2>/dev/null)"; fail=1; fi
+[ ! -e "$tmp/handoff-race/.place.lock" ] && echo "ok   lock: three simultaneous launches leave no lock" \
+  || { echo "FAIL lock: lock left behind after simultaneous launches"; fail=1; }
+
+lockdir=$tmp/handoff/.place.lock
+mkdir -p "$tmp/handoff"; rm -rf "$lockdir"
+# A holder that died without releasing: its pid belongs to no running process.
+sleep 0 & dead=$!; wait "$dead"
+mkdir "$lockdir"; echo "$dead" > "$lockdir/pid"
+t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
+if [ ! -e "$lockdir" ] && [ $(( SECONDS - t0 )) -lt 10 ]
+then echo "ok   lock: stale lock from a dead process is taken over"; else echo "FAIL lock: stale lock kept or waited out"; rm -rf "$lockdir"; fail=1; fi
+# A lock with no pid file is a holder that never finished taking it.
+mkdir "$lockdir"; t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
+if [ ! -e "$lockdir" ] && [ $(( SECONDS - t0 )) -lt 10 ]
+then echo "ok   lock: a lock without a pid file is taken over"; else echo "FAIL lock: pid-less lock kept or waited out"; rm -rf "$lockdir"; fail=1; fi
+
+# A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then goes ahead.
+sleep 30 & holder=$!
+mkdir "$lockdir"; echo "$holder" > "$lockdir/pid"
+t0=$SECONDS; DELEGATE_LOCK_WAIT=1 verdict locktimeout 0 REPORT yes
+if [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] && [ $(( SECONDS - t0 )) -ge 1 ] && [ $(( SECONDS - t0 )) -lt 10 ]
+then echo "ok   lock: a lock that never frees times out and the launch proceeds"
+else echo "FAIL lock: timeout (pid '$(cat "$lockdir/pid" 2>/dev/null)', waited $(( SECONDS - t0 ))s)"; fail=1; fi
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null; rm -rf "$lockdir"
+
+# Released on every path: after a report, and after a start that never lands.
+verdict lockfree 0 REPORT yes
+[ ! -e "$lockdir" ] && echo "ok   lock: released after launch" || { echo "FAIL lock: left behind after a launch"; fail=1; }
+verdict nostart 7 NOSTART no
+[ ! -e "$lockdir" ] && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: left behind after NOSTART"; fail=1; }
+verdict startfail 7 NOSTART yes
+[ ! -e "$lockdir" ] && echo "ok   lock: released after a failed start" || { echo "FAIL lock: left behind after a failed start"; fail=1; }
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
