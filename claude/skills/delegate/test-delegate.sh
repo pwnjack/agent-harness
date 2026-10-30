@@ -173,7 +173,8 @@ cat > "$tmp/bin/herdr" <<'STUB'
 S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
 case "$1 $2" in
-  "agent list") if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
+  "agent list") if [ "$SCEN" = lockblock ]; then echo $$ > "$S/blocked"; exec sleep 30; fi
+                if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
                 elif [ "$SCEN" = race ]; then   # agents started so far, one "pane<TAB>name" line each
                   cat "$S/started" 2>/dev/null | jq -Rn '{result:{agents:[inputs | split("\t") | {tab_id:"t0", pane_id:.[0], name:.[1]}]}}'
                 elif [ "$SCEN" = column ]; then
@@ -445,6 +446,18 @@ verdict nostart 7 NOSTART no
 lockfree && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: still held after NOSTART"; fail=1; }
 verdict startfail 7 NOSTART yes
 lockfree && echo "ok   lock: released after a failed start" || { echo "FAIL lock: still held after a failed start"; fail=1; }
+# Killed while a placement read blocks: no process of the placement (its
+# substitutions, jq, grep) may be left holding the lock.
+mkdir -p "$tmp/state-lockblock"; rm -f "$tmp/state-lockblock/blocked"
+env SCEN=lockblock STATE="$tmp/state-lockblock" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+  DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+  "$here/pane.sh" codex sol medium impl t-lockblock "$b" >/dev/null 2>&1 & launcher=$!
+for _ in $(seq 100); do [ -s "$tmp/state-lockblock/blocked" ] && break; sleep 0.05; done
+kill -9 "$launcher" 2>/dev/null; wait "$launcher" 2>/dev/null
+if lockfree; then echo "ok   lock: a launch killed mid-placement leaves no process holding the lock"
+else echo "FAIL lock: lock still held after the launcher was killed during a blocked placement read"; fail=1; fi
+kill "$(cat "$tmp/state-lockblock/blocked" 2>/dev/null)" 2>/dev/null; wait 2>/dev/null
+
 # A child the started agent leaves behind must not keep the lock.
 out=$(lockrun lockchild)
 lockfree && echo "ok   lock: a long-lived child of agent start does not keep the lock" || { echo "FAIL lock: held by a child of agent start (${out%% *})"; fail=1; }

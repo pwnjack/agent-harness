@@ -246,10 +246,13 @@ if [ -n "$kind" ]; then
   dir=${DELEGATE_HANDOFF_DIR:-/tmp/delegate}; mkdir -p "$dir"
   report=$(newreport "$role-$task") || exit 2
 
-  # From here no herdr process inherits fd 9, or the lock would outlive unlock.
+  # The lock must die with this process, so nothing that outlives it may hold
+  # fd 9: placement runs in one subshell that closes it first (every
+  # substitution, pipeline and tool inside inherits it closed), and the start
+  # call below closes it for herdr.
   herdr() { command herdr "$@" 9>&-; }
   place_lock
-  place
+  pane=$(exec 9>&-; place; echo "$pane")
   [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
   started=0
   herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null && started=1
