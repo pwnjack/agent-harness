@@ -193,8 +193,9 @@ case "$1 $2" in
   "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $4" >> "$S/placements"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
   "agent start") printf '%s\n' "$@" > "$S/start"
-                [ "$SCEN" != race ] || { echo "enter $3" >> "$S/log"; sleep "${START_SLEEP:-0.3}"
-                  printf '%s\t%s\n' "$7" "$3" >> "$S/started"; echo "exit $3" >> "$S/log"; }
+                [ "$SCEN" != race ] || { sleep 0.3; printf '%s\t%s\n' "$7" "$3" >> "$S/started"; }
+                # a long-lived child, as a started agent might leave behind
+                [ "$SCEN" != lockchild ] || { sleep 5 >/dev/null 2>&1 & }
                 [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
@@ -393,77 +394,60 @@ if [ "$(wc -l < "$st/placements" 2>/dev/null)" -eq 3 ] && [ "$(grep -c '^split p
    && [ "$(grep -c '^tab crew$' "$st/placements")" -eq 1 ]
 then echo "ok   lock: simultaneous launches stack in order"
 else echo "FAIL lock: simultaneous launches placed as: $(paste -sd'|' "$st/placements" 2>/dev/null)"; fail=1; fi
-[ ! -e "$tmp/handoff-race/.place.lock" ] && echo "ok   lock: three simultaneous launches leave no lock" \
-  || { echo "FAIL lock: lock left behind after simultaneous launches"; fail=1; }
+if flock -n "$tmp/handoff-race/.place.lock" true
+then echo "ok   lock: three simultaneous launches leave no lock held"; else echo "FAIL lock: held after simultaneous launches"; fail=1; fi
 
-lockdir=$tmp/handoff/.place.lock
-mkdir -p "$tmp/handoff"; rm -rf "$lockdir"
-# A holder that died without releasing: its pid belongs to no running process.
-sleep 0 & dead=$!; wait "$dead"
-mkdir "$lockdir"; echo "$dead" > "$lockdir/pid"
-t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
-if [ ! -e "$lockdir" ] && [ $(( SECONDS - t0 )) -lt 10 ]
-then echo "ok   lock: stale lock from a dead process is taken over"; else echo "FAIL lock: stale lock kept or waited out"; rm -rf "$lockdir"; fail=1; fi
-# A lock with no pid file is a holder that never finished taking it.
-mkdir "$lockdir"; t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
-if [ ! -e "$lockdir" ] && [ $(( SECONDS - t0 )) -lt 10 ]
-then echo "ok   lock: a lock without a pid file is taken over"; else echo "FAIL lock: pid-less lock kept or waited out"; rm -rf "$lockdir"; fail=1; fi
+lockfile=$tmp/handoff/.place.lock
+mkdir -p "$tmp/handoff"
+# lockrun <scenario>: one launch against the shared handoff dir; prints its output.
+lockrun() {
+  mkdir -p "$tmp/state-$1"
+  env SCEN="$1" STATE="$tmp/state-$1" PATH="${LPATH:-$tmp/bin:$PATH}" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+    DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+    DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 "$here/pane.sh" codex sol medium impl "t-$1" "$b" 2>/dev/null
+}
+# lockhold: a background process holding the lock until killed; sets $holder.
+lockhold() {
+  rm -f "$tmp/held"
+  ( exec 8>>"$lockfile"; flock 8 && : > "$tmp/held"; exec sleep 30 ) & holder=$!
+  until [ -e "$tmp/held" ]; do sleep 0.05; done
+}
+# lockfree: whether the lock can be taken at once
+lockfree() { flock -n "$lockfile" true; }
 
-# Several waiters racing on one stale lock: never two holders at once. Each
-# holder logs enter and exit around `agent start`. The mv and rm shims stall
-# the second call on the lock directory, so a waiter that judged the lock
-# dead acts on it late, after another has cleared it and retaken it.
-slow=$tmp/slowbin; mkdir -p "$slow"
-for tool in mv rm; do
-  printf '#!/bin/sh\nfor a in "$1" "$2"; do case "$a" in */.place.lock)\n  n=0; until mkdir "$TICKETS/$n" 2>/dev/null; do n=$((n+1)); done\n  [ "$n" != 1 ] || sleep 1; break ;; esac; done\nexec %s "$@"\n' "$(command -v "$tool")" > "$slow/$tool"
-  chmod +x "$slow/$tool"
-done
-st=$tmp/state-race2; hd=$tmp/handoff-race2; mkdir -p "$st" "$hd" "$tmp/tickets"
-mkdir "$hd/.place.lock"; echo "$dead" > "$hd/.place.lock/pid"
-for t in lk1 lk2 lk3 lk4; do
-  env SCEN=race STATE="$st" START_SLEEP=1.5 TICKETS="$tmp/tickets" PATH="$slow:$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
-    DELEGATE_HANDOFF_DIR="$hd" DELEGATE_LOCK_WAIT=30 CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
-    DELEGATE_POLL=0.1 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
-done
-wait
-if [ "$(grep -c '^enter' "$st/log" 2>/dev/null)" -eq 4 ] \
-   && awk '/^enter/ { d++; if (d > 1) bad = 1 } /^exit/ { d-- } END { exit bad }' "$st/log"
-then echo "ok   lock: waiters racing on one stale lock never hold it together"
-else echo "FAIL lock: holders interleaved or missing: $(paste -sd'|' "$st/log" 2>/dev/null)"; fail=1; fi
-[ ! -e "$hd/.place.lock" ] && [ ! -e "$hd/.place.lock.takeover" ] && echo "ok   lock: racing waiters leave no lock behind" \
-  || { echo "FAIL lock: lock or takeover left behind after racing waiters"; fail=1; }
+# A holder killed without releasing: the kernel frees the lock at once.
+lockhold; kill "$holder"; wait "$holder" 2>/dev/null
+t0=$SECONDS; out=$(DELEGATE_LOCK_WAIT=30 lockrun lockkilled)
+if [ "${out%% *}" = REPORT ] && [ $(( SECONDS - t0 )) -lt 10 ] && ! grep -q 'placement lock' <<<"$out"
+then echo "ok   lock: a lock held by a killed process is free at once"; else echo "FAIL lock: killed holder delayed the launch (${out%% *}, $(( SECONDS - t0 ))s)"; fail=1; fi
 
-# A takeover mutex whose owner died is cleared.
-rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"; echo "$dead" > "$lockdir.takeover/pid"
-t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
-if [ ! -e "$lockdir" ] && [ ! -e "$lockdir.takeover" ] && [ $(( SECONDS - t0 )) -lt 15 ]
-then echo "ok   lock: a takeover mutex left by a dead owner is cleared"; else echo "FAIL lock: dead owner's takeover mutex kept or waited out"; rm -rf "$lockdir" "$lockdir.takeover"; fail=1; fi
-# One whose owner is alive is never revoked, however long it is paused: the
-# launch waits DELEGATE_LOCK_WAIT, goes ahead unlocked, and leaves it alone.
-sleep 30 & owner=$!
-rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"; echo "$owner" > "$lockdir.takeover/pid"
-t0=$SECONDS; DELEGATE_LOCK_WAIT=5 verdict locktimeout 0 REPORT yes
-if [ "$(cat "$lockdir.takeover/pid" 2>/dev/null)" = "$owner" ] && [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$dead" ] && [ $(( SECONDS - t0 )) -ge 5 ]
-then echo "ok   lock: a takeover mutex held by a live owner is not cleared"
-else echo "FAIL lock: live owner's takeover mutex cleared or not waited on (takeover pid '$(cat "$lockdir.takeover/pid" 2>/dev/null)')"; fail=1; fi
-kill "$owner" 2>/dev/null; wait "$owner" 2>/dev/null; rm -rf "$lockdir" "$lockdir.takeover"
-
-# A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then goes ahead.
-sleep 30 & holder=$!
-mkdir "$lockdir"; echo "$holder" > "$lockdir/pid"
-t0=$SECONDS; DELEGATE_LOCK_WAIT=1 verdict locktimeout 0 REPORT yes
-if [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] && [ $(( SECONDS - t0 )) -ge 1 ] && [ $(( SECONDS - t0 )) -lt 10 ]
+# A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then
+# goes ahead without the lock and says so.
+lockhold
+t0=$SECONDS; out=$(DELEGATE_LOCK_WAIT=1 lockrun locknote)
+if [ "${out%% *}" = REPORT ] && [ $(( SECONDS - t0 )) -ge 1 ] && [ $(( SECONDS - t0 )) -lt 10 ] \
+   && grep -q '^placement lock not free after 1s; launched without it$' <<<"$out" && ! lockfree
 then echo "ok   lock: a lock that never frees times out and the launch proceeds"
-else echo "FAIL lock: timeout (pid '$(cat "$lockdir/pid" 2>/dev/null)', waited $(( SECONDS - t0 ))s)"; fail=1; fi
-kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null; rm -rf "$lockdir"
+else echo "FAIL lock: timeout (${out%% *}, waited $(( SECONDS - t0 ))s, output: $(tail -n +2 <<<"$out" | head -n 2 | paste -sd'|' -))"; fail=1; fi
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
 
-# Released on every path: after a report, and after a start that never lands.
+# Without flock on PATH the launch proceeds, silently.
+farm=$tmp/noflock; mkdir -p "$farm"
+for f in /usr/bin/* /bin/*; do [ -L "$farm/${f##*/}" ] || [ "${f##*/}" = flock ] || ln -s "$f" "$farm/${f##*/}"; done
+out=$(LPATH="$tmp/bin:$farm" lockrun locknoflock)
+if [ "${out%% *}" = REPORT ] && ! grep -q 'placement lock' <<<"$out" && ! [ -e "$farm/flock" ]
+then echo "ok   lock: no flock on PATH: the launch proceeds"; else echo "FAIL lock: launch without flock gave '${out%% *}'"; fail=1; fi
+
+# Released on every path: the next launch could take the lock at once.
 verdict lockfree 0 REPORT yes
-[ ! -e "$lockdir" ] && echo "ok   lock: released after launch" || { echo "FAIL lock: left behind after a launch"; fail=1; }
+lockfree && echo "ok   lock: released after launch" || { echo "FAIL lock: still held after a launch"; fail=1; }
 verdict nostart 7 NOSTART no
-[ ! -e "$lockdir" ] && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: left behind after NOSTART"; fail=1; }
+lockfree && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: still held after NOSTART"; fail=1; }
 verdict startfail 7 NOSTART yes
-[ ! -e "$lockdir" ] && echo "ok   lock: released after a failed start" || { echo "FAIL lock: left behind after a failed start"; fail=1; }
+lockfree && echo "ok   lock: released after a failed start" || { echo "FAIL lock: still held after a failed start"; fail=1; }
+# A child the started agent leaves behind must not keep the lock.
+out=$(lockrun lockchild)
+lockfree && echo "ok   lock: a long-lived child of agent start does not keep the lock" || { echo "FAIL lock: held by a child of agent start (${out%% *})"; fail=1; }
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
