@@ -119,14 +119,26 @@ unlock() {
   lock=
 }
 place_lock() {
-  local l=$dir/.place.lock tries=$(( ${DELEGATE_LOCK_WAIT:-90} * 2 )) holder nopid=0
+  local l=$dir/.place.lock tries=$(( ${DELEGATE_LOCK_WAIT:-90} * 2 )) holder now nopid=0 busy=0
   while [ "$tries" -gt 0 ]; do
     if mkdir "$l" 2>/dev/null; then echo "$$" > "$l/pid"; lock=$l; trap unlock EXIT; return; fi
     holder=$(cat "$l/pid" 2>/dev/null)
     if [ -z "$holder" ]; then nopid=$(( nopid + 1 )); else nopid=0; fi
-    # Dead holder, or a lock that never got its pid file: clear it and retry.
+    # Dead holder, or a lock that never got its pid file. Clearing it is a
+    # compare-and-remove under its own mutex: another waiter may have cleared
+    # it and a live holder retaken it since this one looked.
     if { [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; } || [ "$nopid" -ge 3 ]; then
-      if mv "$l" "$l.stale.$$" 2>/dev/null; then rm -rf "$l.stale.$$"; nopid=0; fi
+      if mkdir "$l.takeover" 2>/dev/null; then
+        busy=0
+        [ -n "$holder" ] || sleep 0.1   # let a lock taken just now write its pid
+        now=$(cat "$l/pid" 2>/dev/null)
+        if [ "$now" = "$holder" ] && { [ -z "$holder" ] || ! kill -0 "$holder" 2>/dev/null; }; then rm -rf "$l"; fi
+        rm -rf "$l.takeover"; nopid=0
+      else
+        # Held for milliseconds; one seen for ~3s belongs to a waiter that died.
+        busy=$(( busy + 1 ))
+        [ "$busy" -lt 6 ] || { rm -rf "$l.takeover"; busy=0; }
+      fi
     fi
     tries=$(( tries - 1 )); sleep 0.5
   done

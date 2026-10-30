@@ -193,7 +193,8 @@ case "$1 $2" in
   "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $4" >> "$S/placements"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
   "agent start") printf '%s\n' "$@" > "$S/start"
-                [ "$SCEN" != race ] || { sleep 0.3; printf '%s\t%s\n' "$7" "$3" >> "$S/started"; }
+                [ "$SCEN" != race ] || { echo "enter $3" >> "$S/log"; sleep "${START_SLEEP:-0.3}"
+                  printf '%s\t%s\n' "$7" "$3" >> "$S/started"; echo "exit $3" >> "$S/log"; }
                 [ "$SCEN" = gate ] && echo "Do you trust this folder?" > "$S/screen"
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
@@ -407,6 +408,36 @@ then echo "ok   lock: stale lock from a dead process is taken over"; else echo "
 mkdir "$lockdir"; t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
 if [ ! -e "$lockdir" ] && [ $(( SECONDS - t0 )) -lt 10 ]
 then echo "ok   lock: a lock without a pid file is taken over"; else echo "FAIL lock: pid-less lock kept or waited out"; rm -rf "$lockdir"; fail=1; fi
+
+# Several waiters racing on one stale lock: never two holders at once. Each
+# holder logs enter and exit around `agent start`. The mv and rm shims stall
+# the second call on the lock directory, so a waiter that judged the lock
+# dead acts on it late, after another has cleared it and retaken it.
+slow=$tmp/slowbin; mkdir -p "$slow"
+for tool in mv rm; do
+  printf '#!/bin/sh\nfor a in "$1" "$2"; do case "$a" in */.place.lock)\n  n=0; until mkdir "$TICKETS/$n" 2>/dev/null; do n=$((n+1)); done\n  [ "$n" != 1 ] || sleep 1; break ;; esac; done\nexec %s "$@"\n' "$(command -v "$tool")" > "$slow/$tool"
+  chmod +x "$slow/$tool"
+done
+st=$tmp/state-race2; hd=$tmp/handoff-race2; mkdir -p "$st" "$hd" "$tmp/tickets"
+mkdir "$hd/.place.lock"; echo "$dead" > "$hd/.place.lock/pid"
+for t in lk1 lk2 lk3 lk4; do
+  env SCEN=race STATE="$st" START_SLEEP=1.5 TICKETS="$tmp/tickets" PATH="$slow:$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+    DELEGATE_HANDOFF_DIR="$hd" DELEGATE_LOCK_WAIT=30 CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
+    DELEGATE_POLL=0.1 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
+done
+wait
+if [ "$(grep -c '^enter' "$st/log" 2>/dev/null)" -eq 4 ] \
+   && awk '/^enter/ { d++; if (d > 1) bad = 1 } /^exit/ { d-- } END { exit bad }' "$st/log"
+then echo "ok   lock: waiters racing on one stale lock never hold it together"
+else echo "FAIL lock: holders interleaved or missing: $(paste -sd'|' "$st/log" 2>/dev/null)"; fail=1; fi
+[ ! -e "$hd/.place.lock" ] && [ ! -e "$hd/.place.lock.takeover" ] && echo "ok   lock: racing waiters leave no lock behind" \
+  || { echo "FAIL lock: lock or takeover left behind after racing waiters"; fail=1; }
+
+# A takeover mutex left by a waiter that died is cleared after a few seconds.
+rm -rf "$lockdir"; mkdir "$lockdir" "$lockdir.takeover"; echo "$dead" > "$lockdir/pid"
+t0=$SECONDS; DELEGATE_LOCK_WAIT=30 verdict lockstale 0 REPORT yes
+if [ ! -e "$lockdir" ] && [ ! -e "$lockdir.takeover" ] && [ $(( SECONDS - t0 )) -lt 15 ]
+then echo "ok   lock: an abandoned takeover mutex is cleared"; else echo "FAIL lock: abandoned takeover mutex kept or waited out"; rm -rf "$lockdir" "$lockdir.takeover"; fail=1; fi
 
 # A live holder that never lets go: the launch waits DELEGATE_LOCK_WAIT, then goes ahead.
 sleep 30 & holder=$!
