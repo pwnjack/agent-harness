@@ -104,7 +104,7 @@ fails its caller.
 `herdr/apply-config.sh` checks the merged file with `herdr config check`,
 restores it if Herdr rejects it, and reloads a running server. It warns when
 `ui.sidebar.agents.rows_by_agent.claude` or `.codex` is set, because a
-per-agent row set replaces the Card layout for that agent. Codex runs a new
+per-agent row set replaces the harness layout for that agent. Codex runs a new
 hook only after the user trusts it once in an interactive session.
 
 ## Removing the harness

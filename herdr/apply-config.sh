@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Merge the tracked Herdr Card layout into Herdr's config, check it, and roll
+# Merge the tracked Herdr harness layout into Herdr's config, check it, and roll
 # back if Herdr rejects the result. Usage: apply-config.sh (no arguments).
 # Target: $HERDR_CONFIG_PATH, else $XDG_CONFIG_HOME/herdr/config.toml.
 set -euo pipefail
@@ -42,7 +42,7 @@ if ! check=$(herdr config check 2>&1); then
   exit 1
 fi
 
-# A per-agent row set replaces the Card layout for that agent. Headers and
+# A per-agent row set replaces the harness layout for that agent. Headers and
 # keys are read as dotted paths of bare or wholly quoted segments; anything
 # else is unreadable and matches nothing, and every header resets the scope,
 # so only ui.sidebar.agents.rows_by_agent.<agent> warns.
@@ -77,7 +77,7 @@ for agent in claude codex; do
     }
     END { exit !found }
   ' "$target"; then
-    echo "herdr: warning: rows_by_agent.$agent in $target replaces the Card layout for $agent"
+    echo "herdr: warning: rows_by_agent.$agent in $target replaces the harness layout for $agent"
   fi
 done
 

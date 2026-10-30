@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# apply-config.sh merges the Card layout into Herdr's config and rolls back on a failed check.
+# apply-config.sh merges the harness layout into Herdr's config and rolls back on a failed check.
 set -uo pipefail
 unset HERDR_PANE_ID HERDR_SOCKET_PATH HARNESS_ROLE HERDR_CONFIG_PATH
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -111,7 +111,7 @@ else no 'HERDR_CONFIG_PATH is merged, checked and reloaded'; fi
 live
 printf '\n[ui.sidebar.agents.rows_by_agent]\nclaude = [["state_icon"]]\n' >> "$default"
 out=$(bash "$apply" 2>&1); rc=$?
-if [ "$rc" = 0 ] && grep -q "herdr: warning: rows_by_agent.claude in $default replaces the Card layout for claude" <<<"$out" \
+if [ "$rc" = 0 ] && grep -q "herdr: warning: rows_by_agent.claude in $default replaces the harness layout for claude" <<<"$out" \
    && ! grep -q 'rows_by_agent.codex' <<<"$out" && grep -q '^claude = ' "$default"; then
   ok 'rows_by_agent.claude warns and survives'
 else no 'rows_by_agent.claude warns and survives'; fi

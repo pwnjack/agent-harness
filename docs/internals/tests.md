@@ -46,7 +46,7 @@ including Herdr, so they never install hooks or units on the host.
   watchdog on a hung call.
 - `test-driver.sh`: `test.sh` clears inherited Herdr environment variables
   before running the suites.
-- `herdr/test-apply-config.sh`: the Card layout merge, rollback on a failed
+- `herdr/test-apply-config.sh`: the harness layout merge, rollback on a failed
   merge or config check, the backup kept when rollback fails, the `rows_by_agent` warning, reload and skipping without Herdr.
 - `claude/test-statusline.sh`: the status line reports to the sidebar without
   changing what it prints.
