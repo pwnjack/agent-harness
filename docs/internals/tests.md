@@ -19,7 +19,8 @@ including Herdr, so they never install hooks or units on the host.
   paths, commit identity, push URL checks, SSH deferral, push diagnostics and
   retries.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
-  IDs, plugin marketplaces.
+  IDs, plugin marketplaces, and the review rubric named in the delegate skill
+  and kept report-only.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
   gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
   recovery, limit text that is not a quota hit, malformed reports, `--wait`

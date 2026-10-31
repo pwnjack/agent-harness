@@ -35,6 +35,12 @@ done < <(grep -rhoE '~/\.claude/skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE
 check "global instructions name an existing skill" \
   bash -c 'grep -q "\`delegate\` skill" "$1" && test -f "$2/delegate/SKILL.md"' _ "$claude/CLAUDE.global.md" "$here"
 
+# --- the review rubric the delegate skill hands to every reviewer --------------
+# shellcheck disable=SC2088  # a literal ~ path, matched as text
+check "delegate: the review brief names the rubric" \
+  grep -q '~/\.claude/skills/delegate/review\.md' "$here/delegate/SKILL.md"
+check "delegate: the rubric is report-only" grep -q 'edit no file' "$here/delegate/review.md"
+
 # --- no pinned model identifiers in instruction text ---------
 check "no pinned model ids in skill or instruction text" \
   bash -c '! grep -rEq "claude-(opus|sonnet|haiku|fable)-[0-9]|gpt-[0-9]" "$1" "$2" --include="*.md"' \
