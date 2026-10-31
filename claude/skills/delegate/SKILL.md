@@ -49,10 +49,16 @@ the implementer's report or test claims:
 - uncommitted work: `git diff HEAD`, plus `git status --short` for new files
 - a commit: `git show <sha>`; a branch: `git diff main...<branch>`
 
-Tell it: "Report findings only; do not edit any file. For each: file, line,
-what is wrong, why it matters." Check every finding against the code yourself,
-drop what does not hold, and give the user one report that merges the verified
-findings with your own assessment.
+Tell it: "Read `~/.claude/skills/delegate/review.md` and follow it. Report
+findings only; do not edit any file." Check every finding against the code
+yourself, drop what does not hold, and give the user one report that merges the
+verified findings with your own assessment, keeping the rubric's numbers and
+groups. Apply only the findings the user picks, then re-run the verification.
+
+When the user asks for a lean or simplify review of existing code, send the
+same rubric to Codex (a Claude model when Codex is unusable) as role `review`,
+task `lean` or `lean-<area>`, and name the files or folders and "lean review"
+in the brief.
 
 ## The brief
 
@@ -134,7 +140,8 @@ three rows; effort is chosen per task as above.
   fresh pane with a stronger model or a higher effort. Close the pane when the task review passes.
 - **Reviewers.** Task review and re-review: the other family from that task's
   implementer. Final review: the other family to the implementers, on the
-  whole branch; this is the review above, reported once. Keep a plan's
+  whole branch; this is the review above, reported once, and its notes file
+  ends with the rubric line from Review. Keep a plan's
   implementers to one family; if both implemented, each family reviews it.
 - `requesting-code-review` is the review above; `dispatching-parallel-agents`
   is one pane per agent. Never nest an orchestrator: workers are leaves.

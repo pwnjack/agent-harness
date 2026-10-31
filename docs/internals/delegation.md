@@ -7,6 +7,15 @@
   reviews, reported as same-family.
 - **Blind review.** The reviewer never sees the implementer's report.
 - **One review mandate.** Only `CLAUDE.global.md` requires a review.
+- **One rubric.** `claude/skills/delegate/review.md` is the reviewer's
+  checklist, read from the brief by Claude and Codex alike, so it costs
+  context only in the reviewer's pane. Findings are ordered bug, risk, load,
+  missing test, speed, lean; each needs a concrete case, and a lean finding
+  must say how the simpler form keeps the behaviour. They are numbered across
+  must, should and nice so the user picks which to apply. A lean review is
+  the same rubric limited to the lean group, on whole files instead of a diff,
+  run on request. SDD's task reviews keep the plugin's own templates; the
+  final review gets the rubric through its notes file.
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call.
   The first worker splits the orchestrator's pane to the right and the second
