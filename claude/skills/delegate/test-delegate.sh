@@ -276,8 +276,13 @@ verdict() {
     DELEGATE_POLL=0.01 DELEGATE_QUIET="${QUIET:-30}" DELEGATE_LAND="${LAND:-30}" DELEGATE_KEEP="${KEEP:-}" \
     "$here/pane.sh" "$@" 2>/dev/null); rc=$?
   [ -e "$st/closed" ] && closed=yes
-  if [ "$rc" = "$want" ] && [ "${out%% *}" = "$word" ] && [ "$closed" = "$close" ]; then echo "ok   pane $sc -> $word"
-  else echo "FAIL pane $sc: exit $rc want $want, verdict '${out%% *}' want $word, closed $closed want $close"; fail=1; fi
+  # The verdict line ends in " kept" exactly when the pane is still open.
+  local first=${out%%$'\n'*} kept=no wantkept=no
+  [[ $first == *' kept' ]] && kept=yes
+  # Not GONE (the pane vanished) and not an exit before any pane existed.
+  [ "$close" = no ] && [ "$word" != GONE ] && [[ $first != *' pane= '* ]] && wantkept=yes
+  if [ "$rc" = "$want" ] && [ "${out%% *}" = "$word" ] && [ "$closed" = "$close" ] && [ "$kept" = "$wantkept" ]; then echo "ok   pane $sc -> $word"
+  else echo "FAIL pane $sc: exit $rc want $want, verdict '${out%% *}' want $word, closed $closed want $close, kept $kept want $wantkept"; fail=1; fi
 }
 mkdir -p "$tmp/handoff"
 verdict happy       0 REPORT   yes
