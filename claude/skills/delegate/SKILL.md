@@ -106,7 +106,8 @@ and exits with one verdict line (meanings in the script header):
   and the bad keys printed). Prompt once for the report only, then `--wait`.
 - `QUOTA`: that family is out for the rest of the session; re-route.
 - `NOSTART`, `GONE`, `TIMEOUT`: read the printed screen and report; do not
-  silently retry.
+  silently retry. A `TIMEOUT` may be an idle Claude worker whose background
+  shell never ended.
 - `NOHERDR`: not in a Herdr session (never returned inside one). Claude
   workers fall back to the Agent tool with the same choice and brief (`model`
   set to the alias, `effort` to the chosen effort, `run_in_background: true`);

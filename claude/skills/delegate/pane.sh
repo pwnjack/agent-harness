@@ -84,7 +84,7 @@ split_largest() { # pane-in-tab candidates fallback-pane
   split_pane "$id" "$dir"
 }
 place() {
-  local cols last tabs panes i label tid ids unused= ws=${HERDR_WORKSPACE_ID:-}
+  local cols last tabs panes i label tid ids ws=${HERDR_WORKSPACE_ID:-}
   # Herdr tab ids are <workspace>:<tab>, so the tab names the workspace too.
   [ -n "$ws" ] || case ${HERDR_TAB_ID:-} in ?*:*) ws=${HERDR_TAB_ID%%:*} ;; esac
   cols=$(herdr agent list 2>/dev/null | jq -c --arg tab "${HERDR_TAB_ID:-}" --arg roles "$ROLES" \
@@ -102,17 +102,22 @@ place() {
      || ! panes=$(herdr pane list 2>/dev/null | jq -ec '.result.panes' 2>/dev/null); then
     pane=$(split_pane "$last" down); return
   fi
-  # Crew, crew-2, crew-3...: the first tab with room, else the first unused label.
-  for (( i = 1; i <= $(grep -c . <<<"$tabs") + 1; i++ )); do
-    label=$CREW; [ "$i" = 1 ] || label=$CREW-$i
-    tid=$(awk -F'\t' -v l="$label" '$1 == l { print $2; exit }' <<<"$tabs")
-    if [ -z "$tid" ]; then unused=${unused:-$label}; continue; fi
+  # Every crew or crew-N tab, duplicate labels included, in tab order: the first
+  # with room takes the worker.
+  while IFS=$'\t' read -r label tid; do
+    [[ $label =~ ^$CREW(-[0-9]+)?$ ]] || continue
     ids=$(jq -c --arg t "$tid" '[.[] | select(.tab_id == $t) | .pane_id]' <<<"$panes")
     if [ "$(jq length <<<"$ids")" -lt "$TAB_SLOTS" ]; then
       pane=$(split_largest "$(jq -r '.[0]' <<<"$ids")" "$ids" "$last"); return
     fi
+  done <<<"$tabs"
+  # None has room: a new tab in this workspace under the first unused label
+  # (crew, crew-2...).
+  for (( i = 1; ; i++ )); do
+    label=$CREW; [ "$i" = 1 ] || label=$CREW-$i
+    cut -f1 <<<"$tabs" | grep -qxF -- "$label" || break
   done
-  pane=$(herdr tab create --label "$unused" --cwd "$PWD" --no-focus --env "HARNESS_ROLE=$role" \
+  pane=$(herdr tab create --workspace "$ws" --label "$label" --cwd "$PWD" --no-focus --env "HARNESS_ROLE=$role" \
     | jq -r '.result.root_pane.pane_id // empty')
 }
 
@@ -159,6 +164,12 @@ snapshot() { status; pre=$st preseq=$seq; }
 # message is followed by three or four), for the tools' own error wording: a
 # task that merely mentions limits must not trip it.
 quota() { screen 8 | grep -qiE "hit your usage limit|(usage|rate) limit (reached|exceeded)|not supported when using codex"; }
+# A Claude worker idle on its own background work: in the last 4 lines,
+# Claude Code's footer counts it as "· 1 shell, 1 monitor", a count that opens
+# a "·" segment or the line and ends at ",", "·" or the line end.
+busy() {
+  screen 4 | grep -qE '(^[[:space:]]*|·[[:space:]]*)[0-9]+ (shell|monitor)s?[[:space:]]*(,|·|$)'
+}
 finish() { # verdict exit-code [close]
   local kept=   # the pane stays open unless closed here or already gone
   [ "${3:-}" = close ] || [ "$1" = GONE ] || kept=' kept'
@@ -322,7 +333,10 @@ while :; do
         # falls back to a done that was not already there.
         if [ -n "$seq" ]; then [ "$seq" -le "${preseq:--1}" ] || landed=1
         elif [ "$st" = done ] && [ "$pre" != done ]; then landed=1; fi
-        if [ "$landed" = 1 ]; then
+        if [ "$landed" = 1 ] && [ "$kind" != codex ] && busy; then
+          quota && finish QUOTA 5 close
+          quiet_since=   # its own background work runs on; TIMEOUT is the backstop
+        elif [ "$landed" = 1 ]; then
           quiet_since=${quiet_since:-$now}
           if [ $(( now - quiet_since )) -ge "$quiet" ]; then quota && finish QUOTA 5 close; finish NOREPORT 4; fi
         elif [ "$el" -ge "$land" ]; then
