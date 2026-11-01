@@ -25,7 +25,7 @@
 moves an existing file aside into `~/.local/state/dotfiles-agents-backup/<time>/`
 instead of deleting it, deletes links into this repo whose target is gone,
 lets Herdr install its own agent-state hooks, and sets the clone's
-`core.hooksPath` to `githooks`.
+`core.hooksPath` to `githooks` when the copy has a `.git` entry.
 
 - The global files are named `CLAUDE.global.md` and `AGENTS.global.md`.
 - Live settings are regular files. Edit the tracked file, then run the apply
@@ -34,13 +34,24 @@ lets Herdr install its own agent-state hooks, and sets the clone's
   and passed to later processes as an argument. Codex follows
   `${CODEX_HOME:-$HOME/.codex}`; state and units follow `XDG_STATE_HOME` and
   `XDG_CONFIG_HOME`.
-- The harness link is always `$HOME/.claude/harness`.
+- The harness link is `$HOME/.claude/harness`, created when Claude or Codex is
+  installed.
 - Setup never exports `CLAUDE_CONFIG_DIR`; `test-setup.sh` checks this.
-- `claude/apply-settings.sh` merges objects key by key and replaces a live
-  hook that runs the same script file. It drops a live hook whose
-  `~/.claude/hooks` script is gone but otherwise never removes a key, so a
-  setting dropped from the tracked file must be removed from the live file by
-  hand. It always deletes `advisorModel`.
+- `claude/apply-settings.sh` merges objects key by key. Permission `allow`,
+  `ask` and `deny` arrays are ordered unions: live entries first, then tracked
+  entries, without duplicates. Hooks have the merging rule below; other arrays
+  use the tracked value. The script replaces a live hook that runs the same
+  script file. It drops a live hook whose `~/.claude/hooks` script is gone but
+  otherwise never removes a key, so a setting dropped from the tracked file
+  must be removed from the live file by hand. It always deletes `advisorModel`.
+  A permission rule removed from `claude/settings.json` stays in the live file
+  until it is removed by hand.
+
+`--brain` repairs an interrupted initialisation when the projects gitfile
+points at the expected git directory, completing the remote, opt-in config and
+initial whitelist commit. It refuses an existing git directory without that
+gitfile before changing anything; inspect and recover that directory manually.
+Symlinked `.git` entries and foreign repositories are also refused.
 
 The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
@@ -109,60 +120,72 @@ hook only after the user trusts it once in an interactive session.
 
 ## Removing the harness
 
-For a machine installed with `--brain`, save the block below as a file and run
-it with `bash`, in order (it does not paste into fish). Use the same config
-and XDG paths as at installation; the defaults need no exports. Without a
-brain, omit the timer, unit and brain config commands. Stop active Claude
-sessions first so they do not write the settings back, and keep the clone in
-place until the settings and links are removed.
+Save the block below as a file and run it with `bash`, in order (it does not
+paste into fish). Use the same config and XDG paths as at installation; the
+defaults need no exports. The block also handles installations without a brain
+or with Codex only. Stop active Claude sessions first so they do not write the
+settings back, and keep the clone in place until the settings and links are
+removed.
 
 ```bash
 (
 set -euo pipefail
-config=$(cd -- "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" && pwd -P)
+config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+if [ -d "$config" ]; then config=$(cd -- "$config" && pwd -P); fi
 codex_dir=${CODEX_HOME:-$HOME/.codex}
 units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-harness=$(readlink "$HOME/.claude/harness")
+harness=$(readlink "$HOME/.claude/harness" || true)
 settings="$config/settings.json"
 
-systemctl --user disable --now brain-commit.timer
-rm -- "$units/brain-commit.service" "$units/brain-commit.timer"
-systemctl --user daemon-reload
-git -C "$config/projects" config brain.enabled false
-
-settings_tmp=$(mktemp "$settings.XXXXXX")
-trap 'rm -f -- "$settings_tmp"' EXIT
-cp -p -- "$settings" "$settings_tmp"
-jq --slurpfile tracked "$harness/claude/settings.json" '
-  $tracked[0] as $ours
-  | (if .statusLine == $ours.statusLine then del(.statusLine) else . end)
-  | reduce ["SessionStart", "PreToolUse"][] as $event (.;
-      ([$ours.hooks[$event][].hooks[].command]) as $commands
-      | if .hooks[$event] != null then
-          .hooks[$event] |= [ .[]
-            | .hooks |= map(select(.command as $command
-                | ($commands | index($command)) == null))
-            | select(.hooks | length > 0) ]
-          | if (.hooks[$event] | length) == 0
-            then del(.hooks[$event]) else . end
-        else . end)
-  | if .permissions.deny != null then
-      .permissions.deny -= $ours.permissions.deny
-      | if (.permissions.deny | length) == 0
-        then del(.permissions.deny) else . end
-    else . end
-  | del(.autoDreamEnabled)
-' "$settings" > "$settings_tmp"
-mv -- "$settings_tmp" "$settings"
-
-rm -- "$HOME/.claude/harness"
-for skill in "$harness"/claude/skills/*/; do
-  skill=${skill%/}
-  link="$config/skills/${skill##*/}"
-  if [ -L "$link" ] && [ "$(readlink "$link")" = "$skill" ]; then
-    rm -- "$link"
+if [ -e "$units/brain-commit.service" ] || [ -e "$units/brain-commit.timer" ]; then
+  if [ -e "$units/brain-commit.timer" ]; then
+    systemctl --user disable --now brain-commit.timer
   fi
-done
+  rm -f -- "$units/brain-commit.service" "$units/brain-commit.timer"
+  systemctl --user daemon-reload
+fi
+if [ -f "$config/projects/.git" ]; then
+  git -C "$config/projects" config brain.enabled false
+fi
+
+if [ -n "$harness" ] && [ -f "$settings" ]; then
+  settings_tmp=$(mktemp "$settings.XXXXXX")
+  trap 'rm -f -- "$settings_tmp"' EXIT
+  cp -p -- "$settings" "$settings_tmp"
+  jq --slurpfile tracked "$harness/claude/settings.json" '
+    $tracked[0] as $ours
+    | (if .statusLine == $ours.statusLine then del(.statusLine) else . end)
+    | reduce ["SessionStart", "PreToolUse"][] as $event (.;
+        ([$ours.hooks[$event][].hooks[].command]) as $commands
+        | if .hooks[$event] != null then
+            .hooks[$event] |= [ .[]
+              | .hooks |= map(select(.command as $command
+                  | ($commands | index($command)) == null))
+              | select(.hooks | length > 0) ]
+            | if (.hooks[$event] | length) == 0
+              then del(.hooks[$event]) else . end
+          else . end)
+    | if .permissions.deny != null then
+        .permissions.deny -= $ours.permissions.deny
+        | if (.permissions.deny | length) == 0
+          then del(.permissions.deny) else . end
+      else . end
+    | if .permissions == {} then del(.permissions) else . end
+    | if .hooks == {} then del(.hooks) else . end
+    | del(.autoDreamEnabled)
+  ' "$settings" > "$settings_tmp"
+  mv -- "$settings_tmp" "$settings"
+fi
+
+if [ -n "$harness" ]; then
+  for skill in "$harness"/claude/skills/*/; do
+    skill=${skill%/}
+    link="$config/skills/${skill##*/}"
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "$skill" ]; then
+      rm -- "$link"
+    fi
+  done
+fi
 if [ -L "$config/CLAUDE.md" ] \
    && [ "$(readlink "$config/CLAUDE.md")" = "$harness/claude/CLAUDE.global.md" ]; then
   rm -- "$config/CLAUDE.md"
@@ -171,15 +194,20 @@ if [ -L "$codex_dir/AGENTS.md" ] \
    && [ "$(readlink "$codex_dir/AGENTS.md")" = "$harness/codex/AGENTS.global.md" ]; then
   rm -- "$codex_dir/AGENTS.md"
 fi
+if [ -L "$HOME/.claude/harness" ] \
+   && [ "$(readlink "$HOME/.claude/harness")" = "$harness" ]; then
+  rm -- "$HOME/.claude/harness"
+fi
 )
 ```
 
 The jq filter removes the tracked status line only if it still matches, the
 guard and advisor-reset commands from their hook groups, the tracked deny
 rules and `autoDreamEnabled`. Other hooks, including Herdr's, and unrelated
-settings survive. Only skill and instruction symlinks pointing at this clone
-are removed. The brain worktree, its `.git` file and its git directory remain,
-with automatic commits disabled. Merged preferences, plugin registrations,
-installed plugins and Codex's TOML settings stay; review them against
+settings survive; empty permissions and hooks objects are removed. The block
+is safe to run again after removal. Only skill and instruction symlinks pointing
+at this clone are removed. The brain worktree, its `.git` file and its git
+directory remain, with automatic commits disabled. Merged preferences, plugin
+registrations, installed plugins and Codex's TOML settings stay; review them against
 `claude/settings.json` and `codex/*.toml` to revert those too. The clone's
 `core.hooksPath` stays local to that clone.

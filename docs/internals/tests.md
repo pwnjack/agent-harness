@@ -8,8 +8,13 @@ including Herdr, so they never install hooks or units on the host.
 - `test-setup.sh`: upgrades and fresh installs, the fixed harness link with
   custom config paths, settings preservation, dry runs, the Herdr layout and
   Codex hooks wiring, the private Linux-only
-  brain setup, refusal of foreign repositories, rendered units, repeat runs,
-  and the removal block in `docs/internals/setup.md` run verbatim.
+  brain setup, recovery of interrupted initialisation, refusal of foreign and
+  symlinked repositories and orphaned git directories, rendered units (including
+  a clone path with spaces), permission unions, Codex-only installs, absent tools
+  and source archives, dry-run previews inside an unrelated parent repository,
+  repeat runs, and the removal block in `docs/internals/setup.md` run verbatim
+  twice, including Codex-only installs, removal of empty hooks and permissions,
+  and preservation of user rules.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
   history in tracked Markdown, and portable flags outside the exemption list.
 - `brain/test-audit.sh`: memory index links, ordering, secret diagnostics,

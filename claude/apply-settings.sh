@@ -3,14 +3,14 @@
 # ~/.claude/settings.json, removing advisorModel and keeping other live keys.
 #
 # The tracked copy holds only the settings authored here.
-# Objects merge key by key, and each tracked hook group is appended after
-# removing, from the live groups,
-# only the hooks that run the same script (matched by file name) — other hooks
-# sharing a group survive, a group left empty is dropped, re-running never
-# duplicates a hook, and a stale absolute-path copy of it is replaced. A live
-# hook that runs a script under ~/.claude/hooks which does not exist is
-# dropped. Idempotent, and a no-op when Claude Code is not
-# installed.
+# Objects merge key by key. Permission allow/ask/deny arrays are ordered unions
+# (live entries first, then tracked entries, without duplicates). Other arrays
+# use the tracked value, except hooks: each tracked hook group is appended after
+# removing live hooks that run the same script (matched by file name). Other
+# hooks sharing a group survive; empty groups are dropped. Re-running never
+# duplicates a hook and replaces stale absolute-path copies. Live hooks running
+# missing scripts under ~/.claude/hooks are dropped. Idempotent, and a no-op
+# when neither Claude Code nor its config directory is present.
 set -euo pipefail
 
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/settings.json"
@@ -36,6 +36,12 @@ jq -s --argjson present "${present:-[]}" '
   def script: (.command // "") | (capture("(?<s>[^/\\s\"\\x{27}]+\\.sh)").s // .);
   .[0] as $live | .[1] as $mine
   | ($live * ($mine | del(.hooks))) | del(.advisorModel)
+  | reduce ["allow", "ask", "deny"][] as $kind (.;
+      if $live.permissions[$kind] != null or $mine.permissions[$kind] != null then
+        .permissions[$kind] = (reduce (($live.permissions[$kind] // [])
+          + ($mine.permissions[$kind] // []))[] as $rule ([];
+            if index($rule) == null then . + [$rule] else . end))
+      else . end)
   | .hooks = (($live.hooks // {}) as $lh
       | reduce (($mine.hooks // {}) | to_entries[]) as $e ($lh;
           ([$e.value[].hooks[]? | script]) as $ours

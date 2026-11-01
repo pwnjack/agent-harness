@@ -39,15 +39,16 @@ export PATH="$tmp/bin:$PATH"
 # Setup configures the clone's hooks, so exercise a disposable clone too.
 source_repo=$repo
 prepare_clone() {
-  repo=$1
-  mkdir -p -- "$repo" || return 1
-  cp -- "$source_repo/setup.sh" "$repo/setup.sh" || return 1
+  local destination=$1 directory
+  mkdir -p -- "$destination" || return 1
+  cp -- "$source_repo/setup.sh" "$destination/setup.sh" || return 1
   for directory in claude codex brain githooks herdr lib; do
-    cp -R -- "$source_repo/$directory" "$repo/$directory" || return 1
+    cp -R -- "$source_repo/$directory" "$destination/$directory" || return 1
   done
-  git init -q -b main -- "$repo"
+  git init -q -b main -- "$destination"
 }
 prepare_clone "$tmp/clone" || exit 1
+repo="$tmp/clone"
 
 fail=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -57,6 +58,18 @@ setup() {
   no "setup.sh $*"
   cat -- "$tmp/output"
   return 1
+}
+exec_argument() {
+  sed -n 's/^ExecStart=//p' "$1" | jq -Rr --arg part "$2" '
+    capture("^(?<first>\\\"([^\\\"\\\\]|\\\\.)*\\\") (?<second>.*)$")
+    | .[$part] | fromjson'
+}
+verify_units() {
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    if systemd-analyze --user verify "$1" "$2" > "$tmp/verify" 2>&1; then
+      ok "$3"
+    else no "$3"; cat -- "$tmp/verify"; fi
+  else ok 'skip: systemd-analyze unavailable'; fi
 }
 
 # Set up dangling instruction and skill links.
@@ -68,6 +81,11 @@ cat > "$CLAUDE_CONFIG_DIR/settings.json" <<'JSON'
 {
   "advisorModel": "fable",
   "keepMe": 1,
+  "permissions": {
+    "deny": ["Read(/private/user/**)", "Read(**/.env)", "Read(/private/user/**)"],
+    "allow": ["Read(/public/**)"],
+    "ask": ["Bash(deploy *)"]
+  },
   "statusLine": {"type": "command", "command": "bash ~/.config/claude/statusline.sh"},
   "hooks": {
     "SessionStart": [{"hooks": [{"type": "command", "command": "bash '/x/herdr-agent-state.sh' session"}]}],
@@ -112,6 +130,30 @@ cp -p -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/once.json"
 setup
 if cmp -s -- "$tmp/once.json" "$CLAUDE_CONFIG_DIR/settings.json"; then ok 'upgrade: settings unchanged on second run'
 else no 'upgrade: settings unchanged on second run'; fi
+if jq -e --slurpfile tracked "$repo/claude/settings.json" '
+  .permissions.deny == (["Read(/private/user/**)"] + $tracked[0].permissions.deny)
+  and .permissions.allow == ["Read(/public/**)"]
+  and .permissions.ask == ["Bash(deploy *)"]
+  and ([.permissions.deny[] | select(. == "Read(**/.env)")] | length) == 1
+' "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'permissions: user rules survive two runs; tracked deny rules added once in order'
+else no 'permissions: user rules survive two runs; tracked deny rules added once in order'; fi
+
+# Exercise tracked allow/ask entries alongside overlapping live rules.
+cp -- "$repo/claude/settings.json" "$tmp/tracked-settings"
+jq '.permissions.allow = ["Read(/public/**)", "Read(/tracked/**)"]
+  | .permissions.ask = ["Bash(tracked *)", "Bash(deploy *)"]' \
+  "$tmp/tracked-settings" > "$repo/claude/settings.json"
+setup
+cp -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/permission-once"
+setup
+if cmp -s -- "$tmp/permission-once" "$CLAUDE_CONFIG_DIR/settings.json" \
+   && jq -e '.permissions.allow == ["Read(/public/**)", "Read(/tracked/**)"]
+     and .permissions.ask == ["Bash(deploy *)", "Bash(tracked *)"]' \
+     "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'permissions: tracked allow and ask rules merge once after live rules'
+else no 'permissions: tracked allow and ask rules merge once after live rules'; fi
+cp -- "$tmp/tracked-settings" "$repo/claude/settings.json"
 
 export HOME="$tmp/fresh" CLAUDE_CONFIG_DIR="$tmp/fresh/.claude" CODEX_HOME="$tmp/fresh/.codex"
 setup --dry-run
@@ -176,6 +218,46 @@ if [ ! -e "$CLAUDE_CONFIG_DIR/projects/.git" ] \
   ok 'plain setup: no brain repository, units, timer or auto-dream'
 else no 'plain setup: no brain repository, units, timer or auto-dream'; fi
 
+# Hide both agents even when they are installed on the host.
+mkdir -p -- "$tmp/no-claude"
+for command in awk bash basename cat cmp date dirname git grep jq ln mkdir mktemp readlink rm; do
+  ln -s -- "$(command -v "$command")" "$tmp/no-claude/$command"
+done
+export HOME="$tmp/without-claude" CLAUDE_CONFIG_DIR="$tmp/without-claude/config"
+export CODEX_HOME="$tmp/without-claude/codex"
+if PATH="$tmp/no-claude" bash -- "$repo/setup.sh" > "$tmp/output" 2>&1 \
+   && [ ! -e "$HOME" ] && [ ! -L "$HOME/.claude/harness" ]; then
+  ok 'neither agent: no harness link or config directory created'
+else no 'neither agent: no harness link or config directory created'; fi
+
+# Codex hooks also run through the shared harness link.
+cp -- "$tmp/bin/codex" "$tmp/no-claude/codex"
+export HOME="$tmp/codex-only" CLAUDE_CONFIG_DIR="$tmp/codex-only/config"
+export CODEX_HOME="$tmp/codex-only/codex" XDG_STATE_HOME="$tmp/codex-only/state"
+export XDG_CONFIG_HOME="$tmp/codex-only/xdg-config"
+if PATH="$tmp/no-claude" bash -- "$repo/setup.sh" > "$tmp/output" 2>&1 \
+   && [ "$(readlink "$HOME/.claude/harness")" = "$repo" ] \
+   && [ "$(readlink "$CODEX_HOME/AGENTS.md")" = "$repo/codex/AGENTS.global.md" ] \
+   && [ -x "$HOME/.claude/harness/codex/hooks/sidebar.sh" ] \
+   && [ ! -e "$CLAUDE_CONFIG_DIR" ] \
+   && jq -e --arg command "bash '$HOME/.claude/harness/codex/hooks/sidebar.sh'" \
+     'any(.hooks.SessionStart[].hooks[]; .command == $command)' "$CODEX_HOME/hooks.json" >/dev/null; then
+  ok 'Codex only: shared harness link resolves the installed sidebar hook'
+else no 'Codex only: shared harness link resolves the installed sidebar hook'; cat -- "$tmp/output"; fi
+
+# A source archive has no local Git configuration to update.
+prepare_clone "$tmp/archive" || exit 1
+if [ "$repo" = "$tmp/clone" ]; then ok 'prepare_clone leaves the caller repo unchanged'
+else no 'prepare_clone leaves the caller repo unchanged'; fi
+mv -- "$tmp/archive/.git" "$tmp/archive-metadata"
+export HOME="$tmp/archive-home" CLAUDE_CONFIG_DIR="$tmp/archive-home/config"
+export CODEX_HOME="$tmp/archive-home/codex"
+if bash -- "$tmp/archive/setup.sh" > "$tmp/output" 2>&1 \
+   && [ "$(readlink "$HOME/.claude/harness")" = "$tmp/archive" ] \
+   && jq -e '.permissions.deny | length > 0' "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'archive: setup succeeds without a .git entry'
+else no 'archive: setup succeeds without a .git entry'; cat -- "$tmp/output"; fi
+
 brain_home() {
   export HOME="$tmp/brain-$1" CLAUDE_CONFIG_DIR="$tmp/brain-$1/config"
   export CODEX_HOME="$tmp/brain-$1/codex" XDG_STATE_HOME="$tmp/brain-$1/state"
@@ -231,6 +313,65 @@ elif cmp -s -- "$tmp/original-gitfile" "$CLAUDE_CONFIG_DIR/projects/.git" \
   ok 'brain: foreign gitfile refused unchanged'
 else no 'brain: foreign gitfile refused unchanged'; fi
 
+brain_home symlink
+mkdir -p -- "$CLAUDE_CONFIG_DIR/projects" "$XDG_STATE_HOME"
+printf 'gitdir: %s/agent-brain.git\n' "$XDG_STATE_HOME" > "$tmp/symlink-gitfile"
+ln -s -- "$tmp/symlink-gitfile" "$CLAUDE_CONFIG_DIR/projects/.git"
+if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: symlinked .git refused unchanged'
+elif [ "$(readlink "$CLAUDE_CONFIG_DIR/projects/.git")" = "$tmp/symlink-gitfile" ] \
+   && [ "$(cat -- "$tmp/symlink-gitfile")" = "gitdir: $XDG_STATE_HOME/agent-brain.git" ] \
+   && [ ! -e "$HOME/.claude" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && grep -qF -- 'refusing existing repository' "$tmp/output"; then
+  ok 'brain: symlinked .git refused unchanged'
+else no 'brain: symlinked .git refused unchanged'; fi
+
+brain_home orphan
+mkdir -p -- "$XDG_STATE_HOME/agent-brain.git"
+printf 'untouched\n' > "$XDG_STATE_HOME/agent-brain.git/sentinel"
+if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: orphaned git directory refused before setup changes'
+elif [ ! -e "$CLAUDE_CONFIG_DIR" ] && [ ! -e "$HOME/.claude" ] \
+   && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && [ "$(cat -- "$XDG_STATE_HOME/agent-brain.git/sentinel")" = untouched ] \
+   && grep -qF -- 'refusing existing brain git directory' "$tmp/output"; then
+  ok 'brain: orphaned git directory refused before setup changes'
+else no 'brain: orphaned git directory refused before setup changes'; fi
+
+# Recreate interruptions after each repository initialisation step.
+for stage in init remote enabled config whitelist staged; do
+  brain_home "interrupted-$stage"
+  projects="$CLAUDE_CONFIG_DIR/projects"
+  mkdir -p -- "$projects" "$XDG_STATE_HOME"
+  git init -q -b main --separate-git-dir "$XDG_STATE_HOME/agent-brain.git" -- "$projects"
+  if [ "$stage" != init ]; then
+    git -C "$projects" remote add origin git@github.com:pwnjack/agent-brain.git
+  fi
+  case "$stage" in enabled|config|whitelist|staged)
+    git -C "$projects" config --local brain.enabled true ;; esac
+  case "$stage" in config|whitelist|staged)
+    git -C "$projects" config --local brain.remote git@github.com:pwnjack/agent-brain.git ;; esac
+  case "$stage" in whitelist|staged)
+    cp -- "$repo/brain/gitignore" "$projects/.gitignore" ;; esac
+  if [ "$stage" = staged ]; then
+    git -C "$projects" add -- .gitignore
+    printf 'leave staged\n' > "$projects/user-file"
+    git -C "$projects" add -f -- user-file
+  fi
+  setup --brain
+  if [ "$(git -C "$projects" remote get-url origin 2>/dev/null)" = git@github.com:pwnjack/agent-brain.git ] \
+     && [ "$(git -C "$projects" config --bool brain.enabled)" = true ] \
+     && [ "$(git -C "$projects" config brain.remote)" = git@github.com:pwnjack/agent-brain.git ] \
+     && [ "$(git -C "$projects" ls-tree --name-only HEAD 2>/dev/null)" = .gitignore ] \
+     && [ "$(git -C "$projects" rev-list --count HEAD 2>/dev/null)" = 1 ] \
+     && git -C "$projects" show HEAD:.gitignore > "$tmp/repaired-ignore" \
+     && cmp -s -- "$repo/brain/gitignore" "$tmp/repaired-ignore" \
+     && { [ "$stage" != staged ] \
+       || [ "$(git -C "$projects" diff --cached --name-only)" = user-file ]; }; then
+    ok "brain: interrupted after $stage repaired with one whitelist commit"
+  else no "brain: interrupted after $stage repaired with one whitelist commit"; fi
+done
+
 brain_home custom
 # Preserve the same live keys and external hook as the upgrade fixture.
 mkdir -p -- "$CLAUDE_CONFIG_DIR"
@@ -259,8 +400,8 @@ if jq -e '.autoDreamEnabled == true and .keepMe == 1
   ok 'brain: auto-dream enabled only in live settings; keepMe and herdr hook preserved'
 else no 'brain: auto-dream enabled only in live settings; keepMe and herdr hook preserved'; fi
 if [ -f "$service" ] && [ -f "$timer" ]; then
-  first=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^(?<arg>\\\"([^\\\"\\\\]|\\\\.)*\\\") ").arg | fromjson')
-  second=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^\\\"([^\\\"\\\\]|\\\\.)*\\\" (?<arg>.*)$").arg | fromjson')
+  first=$(exec_argument "$service" first)
+  second=$(exec_argument "$service" second)
   if [ "$first" = "$repo/brain/commit.sh" ] && [ -x "$first" ] \
      && [ "$second" = "$projects" ] && grep -qxF -- Type=oneshot "$service"; then
     ok 'brain: unit arguments name executable and custom config projects path'
@@ -272,11 +413,7 @@ if [ -f "$service" ] && [ -f "$timer" ]; then
 --user enable --now brain-commit.timer" ]; then
     ok 'brain: timer schedule installed and enabled through user systemctl'
   else no 'brain: timer schedule installed and enabled through user systemctl'; fi
-  if command -v systemd-analyze >/dev/null 2>&1; then
-    if systemd-analyze --user verify "$service" "$timer" > "$tmp/verify" 2>&1; then
-      ok 'brain: rendered units pass systemd-analyze --user verify'
-    else no 'brain: rendered units pass systemd-analyze --user verify'; cat -- "$tmp/verify"; fi
-  else ok 'skip: systemd-analyze unavailable'; fi
+  verify_units "$service" "$timer" 'brain: rendered units pass systemd-analyze --user verify'
   cp -- "$service" "$tmp/service-once"
   cp -- "$timer" "$tmp/timer-once"
   cp -- "$projects/.git" "$tmp/gitfile-once"
@@ -311,13 +448,23 @@ if cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore" \
   ok 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'
 else no 'brain: repeat setup refreshes an outdated whitelist for the next memory commit'; fi
 
+# Verify systemd's parser against a real executable path containing spaces.
+prepare_clone "$tmp/clone with spaces" || exit 1
+repo="$tmp/clone with spaces"
+brain_home spaces
+setup --brain
+verify_units "$XDG_CONFIG_HOME/systemd/user/brain-commit.service" \
+  "$XDG_CONFIG_HOME/systemd/user/brain-commit.timer" \
+  'brain: clone path with spaces passes systemd-analyze --user verify'
+
 # Check executable-path quoting for a clone path containing quotes and backslashes.
 prepare_clone "$tmp/clone with a \"quote and a \\slash" || exit 1
+repo="$tmp/clone with a \"quote and a \\slash"
 brain_home quoted
 setup --brain
 service="$XDG_CONFIG_HOME/systemd/user/brain-commit.service"
 if [ -f "$service" ]; then
-  first=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^(?<arg>\\\"([^\\\"\\\\]|\\\\.)*\\\") ").arg | fromjson')
+  first=$(exec_argument "$service" first)
   if [ "$first" = "$repo/brain/commit.sh" ] && [ -x "$first" ]; then
     ok 'brain: quoted and backslashed clone path dequotes to an existing executable'
   else no 'brain: quoted and backslashed clone path dequotes to an existing executable'; fi
@@ -329,6 +476,25 @@ if [ ! -e "$HOME" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ]; then
   ok 'brain: dry run creates no repository, config, units or timer'
 else no 'brain: dry run creates no repository, config, units or timer'; fi
 
+# Before init, Git probes must not discover an unrelated enclosing repository.
+brain_home dry-parent
+projects="$CLAUDE_CONFIG_DIR/projects"
+mkdir -p -- "$projects"
+git init -q -b main -- "$HOME"
+git -C "$HOME" -c user.name=test -c user.email=test@localhost \
+  -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q --allow-empty -m parent
+git -C "$HOME" remote add origin /unrelated-parent
+cp -- "$HOME/.git/config" "$tmp/parent-config"
+parent_head=$(git -C "$HOME" rev-parse HEAD)
+setup --brain --dry-run
+if grep -qF -- "would run: git -C $projects remote add origin git@github.com:pwnjack/agent-brain.git" "$tmp/output" \
+   && grep -qF -- 'commit -m brain: start --only -- .gitignore' "$tmp/output" \
+   && [ ! -e "$projects/.git" ] && [ ! -e "$XDG_STATE_HOME" ] \
+   && cmp -s -- "$tmp/parent-config" "$HOME/.git/config" \
+   && [ "$(git -C "$HOME" rev-parse HEAD)" = "$parent_head" ]; then
+  ok 'brain: fresh dry run previews remote and commit inside an unrelated parent repo'
+else no 'brain: fresh dry run previews remote and commit inside an unrelated parent repo'; fi
+
 # The timer must not inherit a relative config path from the setup process.
 brain_home relative
 mkdir -p -- "$HOME"
@@ -337,7 +503,7 @@ mkdir -p -- "$HOME"
   export CLAUDE_CONFIG_DIR='relative config'
   setup --brain || exit 1
   service="$XDG_CONFIG_HOME/systemd/user/brain-commit.service"
-  second=$(sed -n 's/^ExecStart=//p' "$service" | jq -Rr 'capture("^\\\"([^\\\"\\\\]|\\\\.)*\\\" (?<arg>.*)$").arg | fromjson')
+  second=$(exec_argument "$service" second)
   [ "$second" = "$HOME/relative config/projects" ]
 )
 if [ "$?" -eq 0 ]; then ok 'brain: relative config resolved to an absolute projects argument'
@@ -359,10 +525,15 @@ done
 # Run the documented removal against links installed through a logical clone
 # path, so its comparisons must use the link target rather than a physical path.
 prepare_clone "$tmp/removal-clone" || exit 1
+repo="$tmp/removal-clone"
 ln -s -- "$repo" "$tmp/linked-clone"
 repo="$tmp/linked-clone"
 brain_home removal
 setup --brain
+jq '.keepMe = 1 | .hooks.SessionStart += [{"hooks": [
+  {"type": "command", "command": "external-hook"}]}]' \
+  "$CLAUDE_CONFIG_DIR/settings.json" > "$tmp/removal-settings"
+cp -- "$tmp/removal-settings" "$CLAUDE_CONFIG_DIR/settings.json"
 awk '
   /^## Removing the harness$/ { section = 1 }
   section && /^```bash$/ { block = 1; next }
@@ -382,6 +553,52 @@ else
   no 'removal: documented commands remove logical clone links and preserve the disabled brain'
   cat -- "$tmp/removal-output"
 fi
+if jq -e 'has("permissions") == false and has("autoDreamEnabled") == false
+  and has("statusLine") == false and .keepMe == 1
+  and [.hooks.SessionStart[].hooks[].command] == ["external-hook"]' \
+  "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'removal: empty permissions object removed and unrelated settings kept'
+else no 'removal: empty permissions object removed and unrelated settings kept'; fi
+cp -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/removed-settings"
+if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
+   && cmp -s -- "$tmp/removed-settings" "$CLAUDE_CONFIG_DIR/settings.json" \
+   && [ ! -L "$CODEX_HOME/AGENTS.md" ]; then
+  ok 'removal: documented commands succeed unchanged on a second run under set -e'
+else no 'removal: documented commands succeed unchanged on a second run under set -e';
+  cat -- "$tmp/removal-output"; fi
+
+# With no foreign hooks, the hooks key must disappear entirely.
+brain_home removal-no-foreign
+setup
+if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
+   && jq -e 'has("hooks") == false' "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'removal: empty hooks object removed when no foreign hooks remain'
+else no 'removal: empty hooks object removed when no foreign hooks remain';
+  cat -- "$tmp/removal-output"; fi
+
+# Non-empty permission objects must survive removal too.
+setup --brain
+jq '.permissions.deny += ["Read(/private/user/**)"]
+  | .permissions.allow = ["Read(/public/**)"]' "$CLAUDE_CONFIG_DIR/settings.json" > "$tmp/removal-settings"
+cp -- "$tmp/removal-settings" "$CLAUDE_CONFIG_DIR/settings.json"
+if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
+   && jq -e '.permissions == {"deny": ["Read(/private/user/**)"], "allow": ["Read(/public/**)"]}' \
+     "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
+  ok 'removal: user permission rules survive'
+else no 'removal: user permission rules survive'; cat -- "$tmp/removal-output"; fi
+
+# Run the same documented block with no Claude config or brain repository.
+export HOME="$tmp/codex-only" CLAUDE_CONFIG_DIR="$tmp/codex-only/config"
+export CODEX_HOME="$tmp/codex-only/codex" XDG_STATE_HOME="$tmp/codex-only/state"
+export XDG_CONFIG_HOME="$tmp/codex-only/xdg-config"
+: > "$TEST_SYSTEMCTL_LOG"
+if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
+   && [ ! -L "$HOME/.claude/harness" ] && [ ! -L "$CODEX_HOME/AGENTS.md" ] \
+   && [ ! -e "$CLAUDE_CONFIG_DIR" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && bash "$tmp/removal.sh" >> "$tmp/removal-output" 2>&1; then
+  ok 'removal: Codex-only install without Claude settings or a brain is repeatable'
+else no 'removal: Codex-only install without Claude settings or a brain is repeatable';
+  cat -- "$tmp/removal-output"; fi
 
 # An inherited Herdr config path must stay untouched: run this suite again with
 # a sentinel in the environment and require the sentinel to stay byte-identical.

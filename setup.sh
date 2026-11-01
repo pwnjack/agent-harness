@@ -10,8 +10,7 @@
 # --brain opts this Linux machine into private memory commits and auto-dream.
 #
 # Links: this repo -> ~/.claude/harness, claude/skills/*/ -> ~/.claude/skills/,
-# claude/CLAUDE.global.md ->
-# ~/.claude/CLAUDE.md,
+# claude/CLAUDE.global.md -> ~/.claude/CLAUDE.md,
 # codex/AGENTS.global.md -> ~/.codex/AGENTS.md (CLAUDE_CONFIG_DIR and CODEX_HOME
 # are honoured, as the apply scripts do). Anything already at a link target is
 # moved — never deleted — into ~/.local/state/dotfiles-agents-backup/<time>/.
@@ -71,6 +70,8 @@ if $brain; then
     else
       refuse "refusing existing repository at $projects/.git"
     fi
+  elif [ -e "$brain_git" ] || [ -L "$brain_git" ]; then
+    refuse "refusing existing brain git directory without $projects/.git: $brain_git"
   fi
 fi
 
@@ -91,10 +92,14 @@ link() {
 }
 
 have jq || { echo "agents: jq is required; skipping harness setup" >&2; exit 1; }
-run git -C "$repo" config --local core.hooksPath githooks
+if [ -e "$repo/.git" ]; then
+  run git -C "$repo" config --local core.hooksPath githooks
+fi
 
-# Commands in tracked settings use this fixed path even with a custom config.
-link "$repo" "$HOME/.claude/harness"
+if have claude || have codex; then
+  # Commands in tracked settings use this fixed path even with a custom config.
+  link "$repo" "$HOME/.claude/harness"
+fi
 
 if have claude; then
   echo "claude: linking harness"
@@ -150,18 +155,22 @@ if $brain; then
   if ! $brain_exists; then
     run mkdir -p -- "$projects" "$(dirname -- "$brain_git")"
     run git init -b main --separate-git-dir "$brain_git" -- "$projects"
+  fi
+  if ! $brain_exists || ! git -C "$projects" remote get-url origin >/dev/null 2>&1; then
     run git -C "$projects" remote add origin git@github.com:pwnjack/agent-brain.git
-    run git -C "$projects" config --local brain.enabled true
-    run git -C "$projects" config --local brain.remote git@github.com:pwnjack/agent-brain.git
+  fi
+  run git -C "$projects" config --local brain.enabled true
+  run git -C "$projects" config --local brain.remote git@github.com:pwnjack/agent-brain.git
+  if ! cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore"; then
+    # The next scanned memory commit records whitelist upgrades too.
     run cp -- "$repo/brain/gitignore" "$projects/.gitignore"
+  fi
+  if ! $brain_exists || ! git -C "$projects" rev-parse --verify HEAD >/dev/null 2>&1; then
     run git -C "$projects" add -- .gitignore
     GIT_AUTHOR_NAME=brain GIT_AUTHOR_EMAIL=brain@localhost \
     GIT_COMMITTER_NAME=brain GIT_COMMITTER_EMAIL=brain@localhost \
       run git -C "$projects" -c commit.gpgsign=false -c core.hooksPath=/dev/null \
-        commit -m 'brain: start'
-  elif ! cmp -s -- "$repo/brain/gitignore" "$projects/.gitignore"; then
-    # The next scanned memory commit records whitelist upgrades too.
-    run cp -- "$repo/brain/gitignore" "$projects/.gitignore"
+        commit -m 'brain: start' --only -- .gitignore
   fi
 
   run mkdir -p -- "$units"
