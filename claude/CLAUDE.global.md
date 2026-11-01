@@ -28,4 +28,5 @@ it and how.
 ## Verification
 
 Evidence before assertions. A worker's test claims are not evidence; re-run the
-verification commands yourself before calling anything done.
+verification commands yourself before calling anything done, and chain a commit
+to them with `&&` so a failing check stops it.
