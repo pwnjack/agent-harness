@@ -7,16 +7,19 @@ set -euo pipefail
 # clears that choice for the new session, without blocking on broken settings.
 (
   [ "${HARNESS_LEAF:-}" != 1 ] || exit 0
-  target="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+  target="${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}/settings.json"
   [ -f "$target" ] || exit 0
+  [ ! -L "$target" ] || exit 0
   tmp=$(mktemp "$target.XXXXXX") || exit 0
   trap 'rm -f -- "$tmp"' EXIT
+  # Copy the mode before filtering; replace the file only after a full write.
+  cp -p -- "$target" "$tmp" || exit 0
   if jq -e -s '
     if length == 1 and (.[0] | type == "object" and has("advisorModel"))
     then .[0] | del(.advisorModel)
     else empty end
   ' "$target" > "$tmp"; then
-    cat -- "$tmp" > "$target" # Keep the settings file mode and inode.
+    mv -- "$tmp" "$target" || exit 0
   fi
-) >/dev/null 2>&1 || :
+) >/dev/null 2>&1
 exit 0

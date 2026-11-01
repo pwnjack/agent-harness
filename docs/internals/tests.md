@@ -1,9 +1,10 @@
 # Tests
 
-`./test.sh` runs every tracked `test-*.sh`; `./test.sh --list` lists them. The
-pre-commit gate runs them against a private export of the staged tree. Tests
-use a temporary HOME, config and state directories and stub machine commands,
-including Herdr, so they never install hooks or units on the host.
+`./test.sh` runs every tracked `test-*.sh`; `./test.sh --list` lists them.
+Both fail if no suites are found. The pre-commit gate runs them against a
+private export of the staged tree and refuses a failed Git environment read.
+Tests use a temporary HOME, config and state directories and stub machine
+commands, including Herdr, so they never install hooks or units on the host.
 
 - `test-setup.sh`: upgrades and fresh installs, the fixed harness link with
   custom config paths, settings preservation, dry runs, the Herdr layout and
@@ -11,7 +12,10 @@ including Herdr, so they never install hooks or units on the host.
   brain setup, refusal of foreign repositories, rendered units, repeat runs,
   and the removal block in `docs/internals/setup.md` run verbatim.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
-  history in tracked Markdown, and portable flags outside the exemption list.
+  history in tracked Markdown, and portable flags outside the exemption list,
+  with fixtures for combined sed flags, backticks and shell comments.
+  The textual scanner does not parse heredoc bodies: prose quotes can affect
+  later shell quote state. Scripts with such heredocs belong in `EXEMPT`.
 - `brain/test-audit.sh`: memory index links, ordering, secret diagnostics,
   nested paths, excluded files and the 4096-byte warning.
 - `brain/test-commit.sh`: whitelist, path and secret refusals, shared-index
@@ -34,23 +38,30 @@ including Herdr, so they never install hooks or units on the host.
   during a blocked placement read leaves nothing holding it).
 - `claude/skills/delegate/test-sdd-brief.sh`: every brief kind is filled and
   blind, bad ranges and changed templates are refused, hostile titles and
-  file names stay literal; against stand-in templates. Under `./test.sh` the
-  check against the installed plugin's own templates is skipped, because HOME
-  is sandboxed; run the suite directly to include it.
+  file names stay literal; against stand-in templates and the installed
+  plugin's templates when present. `./test.sh` resolves the installed skills
+  directory before sandboxing HOME and config, passing it as `SDD_TEST_SKILLS`.
+  That directory is only read; generated briefs stay in the temporary repo.
+  Set `SDD_TEST_SKILLS` to select a directory explicitly; an absent plugin
+  skips only the installed-template check.
 - `claude/hooks/test-agent-guard.sh`: the guard denies inside Herdr, is silent
   outside it, and is registered once after two settings merges.
 - `claude/hooks/test-pkill-guard.sh`: the guard denies `pkill -f` and `pgrep -f`
   without a bracketed pattern, lets other commands and malformed input through
   silently, and is registered once after two settings merges.
 - `claude/hooks/test-advisor-reset.sh`: startup registration, removal of
-  `advisorModel`, worker bypass, settings mode and malformed settings.
+  `advisorModel`, worker bypass, atomic replacement with the settings mode
+  preserved, failed copies and renames, symlinked settings left untouched,
+  unset HOME and config, and malformed settings.
 - `codex/test-codex-config.sh`: `memories = false`, preservation of unrelated
   settings and repeat merges.
 - `herdr/test-sidebar-report.sh`: the reporter's complete token patch, role
   mapping, repository naming, deduplication, silence outside Herdr and the
   watchdog on a hung call.
-- `test-driver.sh`: `test.sh` clears inherited Herdr environment variables
-  before running the suites.
+- `test-driver.sh`: `test.sh` clears inherited Herdr environment variables,
+  resolves the newest installed templates by version before sandboxing, and
+  refuses an empty suite list; pre-commit refuses a failed local Git
+  environment read.
 - `herdr/test-apply-config.sh`: the harness layout merge, rollback on a failed
   merge or config check, the backup kept when rollback fails, the `rows_by_agent` warning, reload and skipping without Herdr.
 - `claude/test-statusline.sh`: the status line reports to the sidebar without

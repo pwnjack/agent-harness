@@ -11,8 +11,12 @@ if ! bash -- "$repo/githooks/snapshot.sh" "$repo" "$snapshot"; then
 fi
 
 # A hook can inherit routes to the real index, worktree and object database.
+if ! git rev-parse --local-env-vars > "$snapshot/local-env-vars"; then
+  echo 'pre-commit: could not read local Git environment; no tests were run' >&2
+  exit 1
+fi
 while IFS= read -r name; do
   unset "$name"
-done < <(git rev-parse --local-env-vars)
+done < "$snapshot/local-env-vars"
 cd "$snapshot/worktree"
 bash -- ./test.sh

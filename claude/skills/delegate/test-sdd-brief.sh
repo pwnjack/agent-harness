@@ -164,7 +164,7 @@ mutate leak2 's/^    Compare\.$/    Compare. See task-N-report.md for author not
 expect4 leak2 review docs/plan.md 1 "$base" "$head" "$tmp/constraints"
 
 # The installed plugin's own templates: catches an upstream rename.
-real=$(ls -d "$HOME"/.claude/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)
+real=${SDD_TEST_SKILLS:-$(ls -d "$HOME"/.claude/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)}
 if [ -n "$real" ]; then SDD_SKILLS=$real suite installed
 else echo "skip installed suite: Superpowers not installed"; fi
 

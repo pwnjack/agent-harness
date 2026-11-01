@@ -14,11 +14,21 @@ cd "$repo" || exit 1
 tmp=$(mktemp -d) || exit 1
 trap 'rm -rf -- "$tmp"' EXIT
 git ls-files -z -- '*test-*.sh' > "$tmp/suites" || exit 1
+if [ ! -s "$tmp/suites" ]; then
+  echo 'no test suites found' >&2
+  exit 1
+fi
 if "$list"; then
   while IFS= read -r -d '' suite; do
     printf '%s\n' "$suite"
   done < "$tmp/suites"
   exit 0
+fi
+
+# Resolve installed templates before HOME changes; suites only read this path.
+if [ -z "${SDD_TEST_SKILLS:-}" ]; then
+  SDD_TEST_SKILLS=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)
+  export SDD_TEST_SKILLS
 fi
 
 # Keep every suite away from machine state, even if it calls setup.sh.
