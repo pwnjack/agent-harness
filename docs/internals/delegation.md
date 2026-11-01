@@ -97,6 +97,13 @@ reset hook leave the user's choice alone.
   pane kept: answer the prompt there, then close the pane and rerun the
   launch, because the brief was never sent.
 - A block in the first seconds of a resumed `--wait` is not reported.
+- A Claude worker idle while its own background work runs is not finished:
+  while the last four lines of text show Claude Code's footer count
+  (`· 1 shell, 1 monitor`, or a count opening the line, followed by `,`, `·`
+  or the line end), the quiet window neither starts nor expires; a usage
+  limit still ends it as QUOTA, and otherwise only TIMEOUT does. Once the
+  count leaves the footer the full quiet window applies. Codex launches skip
+  the check; `--wait` and `--resume` cannot tell the kind, so they apply it.
 - Herdr's `done` is treated like `idle`. A turn can run between two polls,
   so a prompt has landed once Herdr's `completion_seq` (finished turns,
   whatever the focus; absent before the first) is higher than just before the
@@ -109,10 +116,11 @@ reset hook leave the user's choice alone.
   `^[a-z][a-z0-9_-]{0,31}$`; `pane.sh` refuses any other name and finds the
   delegate column by the role prefix.
 - Placement: no column worker splits the orchestrator right; fewer than two
-  splits the largest column pane; a full column fills the first `crew` tab
-  (then `crew-2`…) with fewer than four panes, else creates the first unused
-  label with `herdr tab create` and starts the worker in its root pane. The
-  workspace is `HERDR_WORKSPACE_ID`, or else the prefix of `HERDR_TAB_ID`
+  splits the largest column pane; a full column fills the first tab, in tab
+  order, labelled `crew` or `crew-N` with fewer than four panes (tabs sharing
+  a label included), else creates the first unused label (`crew`, `crew-2`…)
+  with `herdr tab create --workspace` and starts the worker in its root pane.
+  The workspace is `HERDR_WORKSPACE_ID`, or else the prefix of `HERDR_TAB_ID`
   (`<workspace>:<tab>`); with neither, the column stacks. A failing Herdr
   read falls back to splitting the last column pane down; a failed split or
   tab create is NOSTART.

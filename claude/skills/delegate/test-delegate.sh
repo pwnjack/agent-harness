@@ -172,6 +172,13 @@ cat > "$tmp/bin/herdr" <<'STUB'
 #!/usr/bin/env bash
 S=$STATE
 report='{"status":"complete","summary":"s","files_changed":[],"commands_run":[],"tests_run":[],"blockers":[],"concerns":[]}'
+# An idle Claude worker's screen: its last words, the turn line, the prompt box
+# and the footer, then a tall pane's blank lines. bgscreen <turn-tail> <footer-tail>
+bgscreen() {
+  { echo "⏺ Waiting on the test run and its monitor."; echo "✻ Brewed for 11m 10s · done 9:34$1"
+    echo "────────────"; echo "❯ "; echo "────────────"; echo "  ⏵⏵ auto mode on$2 · ← 1 agent"
+    for _ in $(seq 10); do echo; done; } > "$S/screen"
+}
 case "$1 $2" in
   "agent list") if [ "$SCEN" = lockblock ]; then echo $$ > "$S/blocked"; exec sleep 30; fi
                 if [ -s "$S/agents" ]; then cat "$S/agents"; ! [ -e "$S/agentsjunk" ] || echo '{not json'; ! [ -e "$S/agentsexit" ] || exit 1
@@ -191,7 +198,7 @@ case "$1 $2" in
   "pane list") cat "$S/panes" 2>/dev/null || echo '{"result":{"panes":[]}}' ;;
   "pane layout") echo "$4" >> "$S/layoutq"; cat "$S/layout" 2>/dev/null || exit 1
                 ! [ -e "$S/layoutjunk" ] || echo '{not json'; ! [ -e "$S/layoutexit" ] || exit 1 ;;
-  "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $4" >> "$S/placements"
+  "tab create") printf '%s\n' "$@" > "$S/tabcreate"; [ "$SCEN" != race ] || echo "tab $6" >> "$S/placements"
                 echo '{"result":{"tab":{"tab_id":"wD:t7","label":"crew"},"root_pane":{"pane_id":"p2"}}}' ;;
   "agent start") printf '%s\n' "$@" > "$S/start"
                 [ "$SCEN" != race ] || { sleep 0.3; printf '%s\t%s\n' "$7" "$3" >> "$S/started"; }
@@ -229,6 +236,14 @@ case "$1 $2" in
     # latereport fixture: the report lands on the third idle poll after the turn
     if [ "$SCEN" = latereport ] && [ "$st" = idle ] && [ -e "$S/idle" ]; then
       i=$(( $(cat "$S/idle") + 1 )); echo "$i" > "$S/idle"; [ "$i" -lt 3 ] || echo "$report" > "$(cat "$S/report")"; fi
+    # bg* fixtures: idle after the turn, the report on the sixth idle poll;
+    # bggone's background work ends on the third, leaving the turn line;
+    # bgwait is idle and busy from the first poll of a --wait
+    if [ "${SCEN#bg}" != "$SCEN" ] && [ "$st" = idle ] && [ -e "$S/idle" ]; then
+      i=$(( $(cat "$S/idle") + 1 )); echo "$i" > "$S/idle"
+      [ "$SCEN" != bgwait ] || [ "$i" != 1 ] || bgscreen " · 1 shell still running" " · 1 shell"
+      [ "$SCEN" != bggone ] || [ "$i" != 3 ] || bgscreen " · 1 shell, 1 monitor still running" ""
+      [ "$i" -lt 6 ] || echo "$report" > "$(cat "$S/report")"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
         happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*|latestart) echo "$report" > "$(cat "$S/report")"; st=idle ;;
@@ -246,6 +261,18 @@ case "$1 $2" in
         tailmention) st=blocked; printf 'Run: grep "usage limit reached" pane.sh\nAllow command? y/n\n' > "$S/screen" ;;
         noreport) st=idle ;;
         latereport) st=idle; echo 0 > "$S/idle" ;;
+        # idle while its own shell and monitor run, as Claude Code shows it
+        bgidle|bggone|bgcodex) st=idle; echo 0 > "$S/idle"; bgscreen " · 1 shell, 1 monitor still running" " · 1 shell, 1 monitor" ;;
+        bgnone) st=idle; echo 0 > "$S/idle"; bgscreen "" "" ;;
+        # out of quota while its shell runs on
+        bgquota) st=idle; echo 0 > "$S/idle"; bgscreen " · 1 shell still running" " · 1 shell"
+          sed '1s/.*/■ You have hit your usage limit. Try again later./' "$S/screen" > "$S/screen.new"; mv "$S/screen.new" "$S/screen" ;;
+        # a single-count turn line inside the window, no count in the footer
+        bgturn) st=idle; echo 0 > "$S/idle"
+          printf '%s\n' "✻ Brewed for 1m · done 9:34 · 1 shell still running" "❯ " "  ⏵⏵ auto mode on · ← 1 agent" > "$S/screen" ;;
+        # the worker's own words about running work, right above the footer
+        bgprose) st=idle; echo 0 > "$S/idle"
+          printf '%s\n' "⏺ Both checks passed; 2 shells, 1 monitor still running earlier have all exited." "  ⏵⏵ auto mode on · ← 1 agent" > "$S/screen" ;;
         # a report whose concerns field is a string instead of an array
         badreport) echo "${report/\"concerns\":[]/\"concerns\":\"x\"}" > "$(cat "$S/report")"; st=idle ;;
         extrakey) echo "${report%\}},\"extra\":1}" > "$(cat "$S/report")"; st=idle ;;
@@ -275,6 +302,7 @@ verdict() {
   [ "$sc" = wait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/w.json" > "$st/report"; }
   [ "$sc" = keepwait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/kw.json" > "$st/report"; }
   [ "$sc" = waitclose ] && { echo blocked > "$st/status"; echo "$tmp/handoff/wc.json" > "$st/report"; }
+  [ "$sc" = bgwait ] && { echo idle > "$st/status"; echo 0 > "$st/idle"; echo "$tmp/handoff/bw.json" > "$st/report"; }
   [ "$sc" = resumedone ] && echo done > "$st/status"   # the previous round's turn, unseen
   case $sc in fastresume|resumeseq) echo done > "$st/status"; echo 3 > "$st/seq" ;; esac
   out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID="${TAB:-t0}" HERDR_WORKSPACE_ID="${WS-wD}" \
@@ -364,7 +392,7 @@ d=$(fx_dir second); fx_agents "$d" p9; fx_layout "$d" p0:110:66 p9:109:66; launc
 recorded "second worker splits the column pane down" "$d" split "pane split --pane p9 --direction down $common"
 
 d=$(fx_dir third); fx_agents "$d" p9 p8; fx_layout "$d" p0:110:66 p9:109:33 p8:109:33; launch third
-recorded "third worker opens the crew tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+recorded "third worker opens the crew tab" "$d" tabcreate "tab create --workspace wD --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 if [ ! -e "$d/split" ] && grep -A1 -x -- --pane "$d/start" | tail -1 | grep -qx p2
 then echo "ok   layout: worker starts in the crew tab's root pane"; else echo "FAIL layout: crew root pane: start '$(cat "$d/start" 2>/dev/null)'"; fail=1; fi
 
@@ -378,7 +406,7 @@ recorded "crew gap refilled down" "$d" split "pane split --pane pa --direction d
 
 d=$(fx_dir crewfull); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew; fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd
 fx_layout "$d" pa:109:33 pb:109:33 pc:109:33 pd:109:33; launch crewfull
-recorded "full crew opens crew-2" "$d" tabcreate "tab create --label crew-2 --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+recorded "full crew opens crew-2" "$d" tabcreate "tab create --workspace wD --label crew-2 --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 
 d=$(fx_dir crew2); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew wD:t3=crew-2
 fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd wD:t3=pq1 wD:t3=pq2; fx_layout "$d" pq1:109:66 pq2:109:66; launch crew2
@@ -387,14 +415,14 @@ recorded "crew-2 with room is used" "$d" split "pane split --pane pq1 --directio
 # crew closed while crew-2 is full: the new tab takes the lowest free label
 d=$(fx_dir crewlow); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t3=crew-2; fx_panes "$d" wD:t3=pa wD:t3=pb wD:t3=pc wD:t3=pd
 fx_layout "$d" pa:109:33 pb:109:33 pc:109:33 pd:109:33; launch crewlow
-recorded "crew absent, crew-2 full: reopens crew" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+recorded "crew absent, crew-2 full: reopens crew" "$d" tabcreate "tab create --workspace wD --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 
 # no HERDR_WORKSPACE_ID: the tab id names the workspace, so the column still overflows
 d=$(fx_dir nows); TAB=wD:t0 fx_agents "$d" p9 p8; TAB=wD:t0 WS= launch nows
-recorded "no workspace id: overflows into crew" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+recorded "no workspace id: overflows into crew" "$d" tabcreate "tab create --workspace wD --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 
 d=$(fx_dir otherws); fx_agents "$d" p9 p8; fx_tabs "$d" wE:t2=crew; fx_panes "$d" wE:t2=px; fx_layout "$d" px:219:66; launch otherws
-recorded "other workspace's crew ignored" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+recorded "other workspace's crew ignored" "$d" tabcreate "tab create --workspace wD --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 
 d=$(fx_dir tabfail); fx_agents "$d" p9 p8; touch "$d/tabfail"; launch tabfail
 recorded "tab list failure falls back to the column" "$d" split "pane split --pane p8 --direction down $common"
@@ -411,11 +439,20 @@ recorded "agent list followed by malformed data counts no column" "$d" split "pa
 d=$(fx_dir agexit); fx_agents "$d" p9 p8; touch "$d/agentsexit"; launch agexit
 recorded "agent list from a failing herdr counts no column" "$d" split "pane split --pane p0 --direction right $common"
 
+# duplicate crew labels: every crew tab is considered, in tab order
+d=$(fx_dir crewdup); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew wD:t3=crew wD:t4=crew
+fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd wD:t3=pe wD:t3=pf wD:t3=pg wD:t3=ph wD:t4=pr1 wD:t4=pr2
+fx_layout "$d" pr1:109:66 pr2:109:66; launch crewdup
+recorded "two full crew tabs: the third crew tab with room is used" "$d" split "pane split --pane pr1 --direction down $common"
+d=$(fx_dir crewdupfull); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew wD:t3=crew
+fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd wD:t3=pe wD:t3=pf wD:t3=pg wD:t3=ph; launch crewdupfull
+recorded "duplicate full crew tabs: opens crew-2" "$d" tabcreate "tab create --workspace wD --label crew-2 --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+
 # the role reaches every split and every tab create
 d=$(fx_dir rolesplit); launch rolesplit review
 recorded "role on every split" "$d" split "pane split --pane p0 --direction right --cwd $PWD --ratio 0.5 --no-focus --env HARNESS_ROLE=review "
 d=$(fx_dir roletab); fx_agents "$d" p9 p8; launch roletab fix
-recorded "role on every tab" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=fix "
+recorded "role on every tab" "$d" tabcreate "tab create --workspace wD --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=fix "
 # The placement lock: launches started together are placed one after another.
 # "race" has the stub list the agents started so far and take a moment to
 # start one, so a launch that counts the column before the previous one has
@@ -505,7 +542,7 @@ if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/stat
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
 QUIET=0 verdict quota 5 QUOTA    yes
 QUIET=0 verdict quotatall 5 QUOTA yes # blank lines below the message do not hide it
-verdict quotaold 4 NOREPORT no # a mention above the window is not a quota hit
+QUIET=0 verdict quotaold 4 NOREPORT no # a mention above the window is not a quota hit
 LAND=0 verdict idlequota 5 QUOTA yes  # rejected before it ever started
 verdict mentions    3 BLOCKED  no     # a task that talks about limits is not a quota hit
 verdict tailmention 3 BLOCKED  no     # not even with the words at the bottom of the screen
@@ -515,6 +552,16 @@ QUIET=0 verdict noreport 4 NOREPORT no
 # a report that trails the last turn by a few polls is REPORT, not NOREPORT.
 verdict latestart  0 REPORT   yes
 verdict latereport 0 REPORT   yes
+# A Claude worker idle while its own shell and monitor run keeps the verdict
+# open until the report lands; without them, or for Codex, quiet applies.
+QUIET=0 verdict bgidle 0 REPORT yes claude sonnet high impl t-bgidle "$b"
+QUIET=0 verdict bgnone 4 NOREPORT no claude sonnet high impl t-bgnone "$b"
+QUIET=0 verdict bggone 4 NOREPORT no claude sonnet high impl t-bggone "$b"   # the turn line stays; the footer decides
+QUIET=0 verdict bgprose 4 NOREPORT no claude sonnet high impl t-bgprose "$b" # its own prose holds nothing
+QUIET=0 verdict bgcodex 4 NOREPORT no
+QUIET=0 verdict bgquota 5 QUOTA yes claude sonnet high impl t-bgquota "$b"   # a limit still ends it
+QUIET=0 verdict bgturn 4 NOREPORT no claude sonnet high impl t-bgturn "$b"   # only the footer's count holds
+QUIET=0 verdict bgwait 0 REPORT no --wait p1 "$tmp/handoff/bw.json"         # --wait holds too
 # A worker that finished before the first poll worked: NOREPORT, not NOSTART.
 LAND=1 QUIET=0 verdict fastdone 4 NOREPORT no
 # Herdr's completion_seq rose: landed, though the focused pane reads idle.
