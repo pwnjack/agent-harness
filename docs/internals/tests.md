@@ -38,7 +38,8 @@ commands, including Herdr, so they never install hooks or units on the host.
   example honours the brain-present gate and config paths, derives the key
   from the repository root in subdirectories, and propagates audit failures.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
-  gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
+  gate, and every `pane.sh` verdict against a stub Herdr (a case over
+  `CASE_BUDGET` seconds, default 5, fails), including hook-review
   recovery, limit text that is not a quota hit, malformed reports, a worker
   that finishes between polls (by `completion_seq`, focused or resumed, and by
   `done` without it), a late start and a trailing report inside the landing

@@ -292,11 +292,11 @@ chmod +x "$tmp/bin/herdr"
 # verdict <scenario> <want-exit> <want-first-word> <want-pane-closed:yes|no> [pane.sh args...]
 # The stub moves on per poll, not per second, so polls are short. The landing
 # and quiet windows are generous, so load never trips them; a case that must
-# reach one sets LAND=0 or QUIET=0. TAB and WS override the caller's tab and
-# workspace (WS= for none).
+# reach one sets LAND=0 or QUIET=0, and a case over CASE_BUDGET seconds (5)
+# fails. TAB and WS override the caller's tab and workspace (WS= for none).
 verdict() {
   local sc=$1 want=$2 word=$3 close=$4; shift 4
-  local st="$tmp/state-$sc" out rc closed=no
+  local st="$tmp/state-$sc" out rc closed=no t0=$SECONDS
   mkdir -p "$st"
   [ $# -gt 0 ] || set -- codex sol medium impl "t-$sc" "$b"
   [ "$sc" = wait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/w.json" > "$st/report"; }
@@ -317,6 +317,10 @@ verdict() {
   [ "$close" = no ] && [ "$word" != GONE ] && [[ $first != *' pane= '* ]] && wantkept=yes
   if [ "$rc" = "$want" ] && [ "${out%% *}" = "$word" ] && [ "$closed" = "$close" ] && [ "$kept" = "$wantkept" ]; then echo "ok   pane $sc -> $word"
   else echo "FAIL pane $sc: exit $rc want $want, verdict '${out%% *}' want $word, closed $closed want $close, kept $kept want $wantkept"; fail=1; fi
+  # A case that waits out a 30 s window instead of setting QUIET=0 or LAND=0.
+  if [ $(( SECONDS - t0 )) -gt "${CASE_BUDGET:-5}" ]; then
+    echo "FAIL pane $sc: took $(( SECONDS - t0 ))s, over ${CASE_BUDGET:-5}s"; fail=1
+  fi
 }
 mkdir -p "$tmp/handoff"
 verdict happy       0 REPORT   yes
