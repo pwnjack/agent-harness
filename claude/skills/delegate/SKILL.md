@@ -73,6 +73,11 @@ Workers share none of this conversation. Every brief:
 ## Verification  exact commands and expected output
 ```
 
+Codex's sandbox blocks some sockets, so a suite that needs them (for example
+`systemd-analyze` in a setup test) fails there. Tell a Codex worker to run the
+suites in its sandbox without asking to escalate, name the expected sandbox
+failure, and run the full suite yourself afterwards.
+
 ## Running a worker
 
 Inside Herdr (`HERDR_ENV=1`) every worker, Claude or Codex, implementer,
