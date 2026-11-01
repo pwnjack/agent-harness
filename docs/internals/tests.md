@@ -23,10 +23,14 @@ including Herdr, so they never install hooks or units on the host.
   and kept report-only.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
   gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
-  recovery, limit text that is not a quota hit, malformed reports, `--wait`
-  and `--resume` keeping the pane, the trust-prompt BLOCKED, the worker
-  settings that disable Superpowers and the advisor, and the pane placement
-  (column of two, `crew` tabs of four, other workspaces ignored, fallback when
+  recovery, limit text that is not a quota hit, malformed reports, a worker
+  that finishes between polls (by `completion_seq`, focused or resumed, and by
+  `done` without it), a late start and a trailing report inside the landing
+  and quiet windows, `--wait` and `--resume` keeping the pane, the
+  trust-prompt BLOCKED, the worker settings that disable Superpowers and the
+  advisor, and the pane placement
+  (column of two, `crew` tabs of four, the lowest free tab label, other
+  workspaces ignored, the workspace taken from the tab id, fallback when
   `tab list` fails, role on every split and tab), and the placement lock
   (simultaneous launches stack in order, a killed holder frees it at once, a
   stuck lock times out with a note, no `flock` on PATH, release on every path
