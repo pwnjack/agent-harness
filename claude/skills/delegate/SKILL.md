@@ -112,8 +112,9 @@ and exits with one verdict line (meanings in the script header):
   set to the alias, `effort` to the chosen effort, `run_in_background: true`);
   Codex is unavailable, so say so once and take the Claude route.
 
-Close any pane the script left open with `herdr pane close <pane>` once you are
-done with it. Report the model and effort from the verdict line.
+A verdict line ending in `kept` left its pane open: close it with
+`herdr pane close <pane>` once you are done with it. Report the model and
+effort from the verdict line.
 
 ## After any worker
 

@@ -91,7 +91,8 @@ reset hook leave the user's choice alone.
 - Quota is judged only when the worker is idle, against Codex's own error
   wording at the bottom of the screen.
 - `--wait` and `--resume` keep the pane on REPORT; `DELEGATE_KEEP=0` makes
-  `--wait` close it. QUOTA always closes it.
+  `--wait` close it. QUOTA always closes it. Whenever a pane is left open, the
+  verdict line ends in ` kept`.
 - A start that fails on a first-run folder-trust prompt is BLOCKED with the
   pane kept: answer the prompt there, then close the pane and rerun the
   launch, because the brief was never sent.

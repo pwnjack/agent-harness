@@ -20,7 +20,8 @@
 # sidebar reads at a glance; the task must not repeat a role, a family or the
 # alias, and the name must fit Herdr's 32 characters.
 #
-# First stdout line: <VERDICT> pane=... report=... elapsed=...
+# First stdout line: <VERDICT> pane=... report=... elapsed=...[ kept]
+# " kept" ends it whenever the pane is left open.
 #   REPORT 0  report written; pane closed      BLOCKED 3  approval or question
 #   NOREPORT 4  worked, no valid report        QUOTA 5  usage limit; pane closed
 #   GONE 6  pane vanished   NOSTART 7  prompt never landed, or a start gate
@@ -156,7 +157,9 @@ snapshot() { status; pre=$st preseq=$seq; }
 # tools' own error wording: a task that merely mentions limits must not trip it.
 quota() { screen 15 | grep -qiE "hit your usage limit|(usage|rate) limit (reached|exceeded)|not supported when using codex"; }
 finish() { # verdict exit-code [close]
-  echo "$1 pane=$pane report=$report${model:+ model=$model}${effort:+ effort=$effort} elapsed=$(( $(date +%s) - start ))s"
+  local kept=   # the pane stays open unless closed here or already gone
+  [ "${3:-}" = close ] || [ "$1" = GONE ] || kept=' kept'
+  echo "$1 pane=$pane report=$report${model:+ model=$model}${effort:+ effort=$effort} elapsed=$(( $(date +%s) - start ))s$kept"
   [ -z "$note" ] || echo "$note"
   if [ "$1" = REPORT ]; then
     jq '{status, summary, files_changed, blockers, concerns}' <<<"$body"
