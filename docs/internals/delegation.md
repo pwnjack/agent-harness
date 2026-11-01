@@ -89,7 +89,7 @@ reset hook leave the user's choice alone.
   the prompt once. Never answer that screen with
   "trust all"; that is the user's call.
 - Quota is judged only when the worker is idle, against Codex's own error
-  wording at the bottom of the screen.
+  wording in the last lines of text on the screen (blank lines do not count).
 - `--wait` and `--resume` keep the pane on REPORT; `DELEGATE_KEEP=0` makes
   `--wait` close it. QUOTA always closes it. Whenever a pane is left open, the
   verdict line ends in ` kept`.
