@@ -173,6 +173,18 @@ if [ "$result" -eq 0 ] && exact 'WARN -home-u-proj/memory/MEMORY.md: over 4096 b
 else no 'MEMORY.md 4097 bytes: WARN, exit 0'; fi
 
 fixture
+printf '%8192s' '' > "$memory/note.md"
+audit
+if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then
+  ok 'memory file 8192 bytes: no warning'
+else no 'memory file 8192 bytes: no warning'; fi
+printf ' ' >> "$memory/note.md"
+audit
+if [ "$result" -eq 0 ] && exact 'WARN -home-u-proj/memory/note.md: over 8192 bytes'; then
+  ok 'memory file 8193 bytes: WARN, exit 0'
+else no 'memory file 8193 bytes: WARN, exit 0'; fi
+
+fixture
 printf 'Unindexed.\n' > "$memory/z.md"
 printf 'Unindexed.\n' > "$memory/a.md"
 audit
