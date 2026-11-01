@@ -70,7 +70,10 @@
 `claude/apply-settings.sh` deletes `advisorModel` on every merge, and
 `claude/hooks/advisor-reset.sh` (`SessionStart`, matcher `startup`) clears it
 whenever a non-worker Claude session starts, including a scripted
-`claude -p`. Enable `/advisor fable` only in the one session doing the work.
+`claude -p`. The hook writes a temporary file beside the settings and renames
+it after filtering, preserving the file mode. Failed copies, filters or
+renames leave the settings untouched and do not block startup. Enable
+`/advisor fable` only in the one session doing the work.
 The orchestrator proposes it with a reason; the user decides.
 
 Claude workers launched by `pane.sh` get `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`

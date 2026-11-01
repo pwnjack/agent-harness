@@ -11,13 +11,7 @@ tmp=$(mktemp -d) || exit 1
 trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
-mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin" || exit 1
-for command in systemctl uname gh ssh-add; do
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command" || exit 1
-done
-printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "$tmp/bin/herdr" || exit 1
-chmod +x -- "$tmp"/bin/* || exit 1
-export PATH="$tmp/bin:$PATH"
+mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" || exit 1
 
 fail=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -37,7 +31,82 @@ budget "$repo/codex/AGENTS.global.md" "$BUDGET_AGENTS_GLOBAL" \
   "budget: AGENTS.global.md <= $BUDGET_AGENTS_GLOBAL"
 
 # This is a textual guard, not a shell parser; diagnostics retain file and line.
-pattern='(^|[[:space:];|&()])(sed[[:space:]]+([^;|&]*[[:space:]])?-i|date[[:space:]]+([^;|&]*[[:space:]])?-d|stat[[:space:]]+([^;|&]*[[:space:]])?-c|find[[:space:]]+([^;|&]*[[:space:]])?-printf|chmod[[:space:]]+([^;|&]*[[:space:]])?--reference|basename[[:space:]]+([^;|&]*[[:space:]])?-a|mapfile([[:space:];|&()]|$)|(declare|local)[[:space:]]+([^;|&]*[[:space:]])?-[[:alpha:]]*A)'
+pattern='(^|[[:space:];|&()])(sed[[:space:]]+([^;|&]*[[:space:]])?(-[[:alpha:]]*i|--in-place([=[:space:];|&()]|$))|date[[:space:]]+([^;|&]*[[:space:]])?-d|stat[[:space:]]+([^;|&]*[[:space:]])?-c|find[[:space:]]+([^;|&]*[[:space:]])?-printf|chmod[[:space:]]+([^;|&]*[[:space:]])?--reference|basename[[:space:]]+([^;|&]*[[:space:]])?-a|mapfile([[:space:];|&()]|$)|(declare|local)[[:space:]]+([^;|&]*[[:space:]])?-[[:alpha:]]*A)|`'
+scan_shell() {
+  # Strip shell comments, retaining line numbers and quoted hashes. Only
+  # executable backticks count: quoted literals and escaped ones are harmless.
+  # Heredoc bodies are not parsed; prose quotes can leak into shell quote state.
+  # Scripts with such heredocs belong in EXEMPT.
+  awk '
+    BEGIN { single = sprintf("%c", 39); quote = "" }
+    {
+      code = ""; escaped = 0
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (escaped) {
+          code = code (c == "`" ? " " : c); escaped = 0; continue
+        }
+        if (quote == single) {
+          if (c == single) quote = ""
+          code = code (c == "`" ? " " : c); continue
+        }
+        if (c == "\\") { code = code c; escaped = 1; continue }
+        if (c == single && quote == "") quote = single
+        else if (c == "\"") quote = (quote == "" ? "\"" : "")
+        else if (c == "#" && quote == "" &&
+                 (i == 1 || substr($0, i - 1, 1) ~ /[[:space:];|&()]/)) break
+        code = code c
+      }
+      print code
+    }
+  ' "$1" > "$tmp/stripped" || return 2
+  grep -nE -- "$pattern" "$tmp/stripped"
+}
+check_portability() {
+  local label=$1 expected=$2 result
+  cat > "$tmp/fixture.sh"
+  scan_shell "$tmp/fixture.sh" > "$tmp/matches"; result=$?
+  if [ "$result" = "$expected" ]; then ok "portability fixture: $label"
+  else no "portability fixture: $label (exit $result, expected $expected)"; fi
+}
+check_portability 'sed -ni' 0 <<'SH'
+sed -ni 'p' file
+SH
+check_portability 'sed -Ei' 0 <<'SH'
+sed -Ei 's/a/b/' file
+SH
+check_portability 'sed --in-place' 0 <<'SH'
+sed --in-place 's/a/b/' file
+SH
+check_portability 'sed --in-place with suffix' 0 <<'SH'
+sed --in-place=.bak 's/a/b/' file
+SH
+check_portability 'backtick substitution' 0 <<'SH'
+x=`pwd`
+SH
+check_portability 'backticks inside double quotes' 0 <<'SH'
+x="`pwd`"
+SH
+check_portability 'comments are ignored' 1 <<'SH'
+# sed -ni -Ei --in-place; `pwd`; mapfile
+printf ok # sed -i; date -d yesterday; `pwd`
+SH
+check_portability 'literal and escaped backticks' 1 <<'SH'
+printf '%s' '`pwd`'
+printf '%s' "\`pwd\`"
+SH
+check_portability 'quoted hash before a command' 0 <<'SH'
+printf '%s' '#'; sed -ni 'p' file
+SH
+check_portability 'portable sed' 1 <<'SH'
+sed -nE 's/a/b/p' file
+SH
+for command in 'sed -i x file' 'date -d yesterday' 'stat -c %a file' \
+  'find . -printf %p' 'chmod --reference=file other' 'basename -a a b' \
+  'mapfile rows' 'declare -A rows' 'local -A rows'; do
+  check_portability "$command" 0 <<< "$command"
+done
+
 portable=true
 if git -C "$repo" ls-files -z -- '*.sh' > "$tmp/scripts"; then
   while IFS= read -r -d '' file; do
@@ -47,7 +116,7 @@ if git -C "$repo" ls-files -z -- '*.sh' > "$tmp/scripts"; then
     case " $EXEMPT " in
       *" $file "*) continue ;;
     esac
-    if grep -nE -- "$pattern" "$repo/$file" > "$tmp/matches"; then
+    if scan_shell "$repo/$file" > "$tmp/matches"; then
       portable=false
       while IFS= read -r match; do
         printf '  %s:%s\n' "$file" "$match"

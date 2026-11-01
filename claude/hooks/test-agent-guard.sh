@@ -9,14 +9,8 @@ repo=$(cd "$here/../.." && pwd)
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
-mkdir -p -- "$HOME/.claude" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$tmp/bin"
+mkdir -p -- "$HOME/.claude" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
 ln -s -- "$repo" "$HOME/.claude/harness"
-for command in systemctl uname gh ssh-add; do
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/bin/$command"
-done
-printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "$tmp/bin/herdr"
-chmod +x -- "$tmp"/bin/*
-export PATH="$tmp/bin:$PATH"
 fail=0
 ok() { echo "ok   $1"; }
 no() { echo "FAIL $1"; fail=1; }
