@@ -26,8 +26,9 @@
 #   GONE 6  pane vanished   NOSTART 7  prompt never landed, or a start gate
 #   NOHERDR 8  no pane made  TIMEOUT 124      usage errors exit 2, no verdict
 # The pane stays open on BLOCKED, NOREPORT, NOSTART and TIMEOUT: read it,
-# answer or re-prompt with `herdr agent prompt`, then run --wait, and close it
-# with `herdr pane close` when done with it. DELEGATE_KEEP=1 keeps it open on
+# answer or re-prompt with `herdr agent prompt` (a BLOCKED pane refuses it:
+# press the key its screen shows with `herdr pane send-keys`), then run --wait,
+# and close it with `herdr pane close` when done with it. DELEGATE_KEEP=1 keeps it open on
 # REPORT too, for a fix round that resumes it; QUOTA still closes it. --wait
 # keeps it by default (DELEGATE_KEEP=0 closes it on REPORT); --resume always
 # keeps it. A start blocked by a first-run
