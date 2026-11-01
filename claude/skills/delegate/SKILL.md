@@ -94,8 +94,12 @@ characters. The script opens a pane beside you, hands over the brief, asks for a
 and exits with one verdict line (meanings in the script header):
 
 - `REPORT`: the report is printed; `jq . <report>` for the rest.
-- `BLOCKED`: answer with `herdr agent prompt <pane> "..."` when the answer is
-  unambiguous, otherwise ask the user; then rerun with `--wait <pane> <report>`.
+- `BLOCKED`: read the printed screen. Answer a question with
+  `herdr agent prompt <pane> "..."`. An approval menu (a command or permission
+  prompt) refuses a prompt with `agent_blocked`; press its option instead with
+  `herdr pane send-keys <pane> <key>` (the key the menu shows, such as `y`).
+  Answer either only when the answer is unambiguous and inside the brief,
+  otherwise ask the user; then rerun with `--wait <pane> <report>`.
   A first-run folder-trust prompt is the exception: the brief was never sent,
   so once it is answered, close the pane and rerun the launch.
 - `NOREPORT`: no valid report (a malformed one is moved to `<report>.invalid`
