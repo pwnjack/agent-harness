@@ -12,15 +12,20 @@ including Herdr, so they never install hooks or units on the host.
   and the removal block in `docs/internals/setup.md` run verbatim.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
   history in tracked Markdown, and portable flags outside the exemption list.
-- `brain/test-audit.sh`: memory index links, ordering, secret diagnostics,
+- `brain/test-audit.sh`: relative and duplicate memory index links, ordering
+  with older jq and newline-containing paths, secret diagnostics, symlinked
+  files, unknown keys, unreadable files, patterns without a final newline,
   nested paths, excluded files and the 4096-byte warning.
 - `brain/test-commit.sh`: whitelist, path and secret refusals, shared-index
   synchronisation, stale locks and concurrent updates, symlinked project
   paths, commit identity, push URL checks, SSH deferral, push diagnostics and
-  retries.
+  retries, branch and parent-repository guards, hidden projects and patterns
+  without a final newline.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces, and the review rubric named in the delegate skill
-  and kept report-only.
+  and kept report-only; the learning skill and its audit path exist, its
+  example honours the brain-present gate and config paths, derives the key
+  from the repository root in subdirectories, and propagates audit failures.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
   gate, and every `pane.sh` verdict against a stub Herdr, including hook-review
   recovery, limit text that is not a quota hit, malformed reports, `--wait`

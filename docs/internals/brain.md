@@ -18,7 +18,7 @@ whitelist has changed. A re-run changes nothing else. Plain setup creates no
 brain and never enables auto-dream (it does not disable an existing setting). Never run `--brain` on a work machine.
 
 The whitelist admits only `.gitignore` and non-hidden Markdown beneath
-`*/memory/`, excluding `-tmp*` projects. Keep the installed `.gitignore`
+`*/memory/`, excluding hidden and `-tmp*` projects. Keep the installed `.gitignore`
 byte-identical to `brain/gitignore`: the commit script refuses a missing or
 altered copy and any tracked ignored file.
 
@@ -35,6 +35,8 @@ journalctl --user -u brain-commit
 
 `brain/commit.sh`:
 
+- ignores projects directories without their own enabled repository and
+  refuses a HEAD outside `main`, including detached HEADs;
 - builds the candidate tree in a temporary index, ignoring unrelated staging;
 - refuses any candidate path other than `.gitignore` or a non-hidden
   `<key>/memory/**/*.md` outside `-tmp*`, so a nested `.gitignore` cannot
@@ -56,9 +58,17 @@ journalctl --user -u brain-commit
 
 `brain/audit.sh <projects-dir> [project-key...]` is read-only. It reports
 memories absent from `MEMORY.md`, index links to missing files and secret
-patterns by name, and warns when a `MEMORY.md` exceeds 4096 bytes (Claude
-loads only the start of the index). The commit script journals the audit
-after each commit; audit findings never undo a commit.
+patterns by name, including symlinked Markdown files. Only relative file
+links count as memory entries; repeated links are checked once. Symlinks to
+regular files are scanned even outside memory: the audit checks what the
+agent reads, while `commit.sh` stores only the link text. Dangling links and
+links to non-regular targets get one diagnostic per path; symlinked directories
+are never traversed. An explicit key without a memory directory is an error.
+Unreadable files and scan errors are reported without stopping the remaining
+audit. Patterns need no final newline. Findings exit 1; a clean audit exits 0.
+It warns when a `MEMORY.md`
+exceeds 4096 bytes (Claude loads only the start of the index). The commit
+script journals the audit after each commit; audit findings never undo a commit.
 
 Off switches, independent and history-preserving:
 `systemctl --user disable --now brain-commit.timer` stops automatic commits;
@@ -75,5 +85,14 @@ instead. Harness changes are diff proposals that need the user's yes, then a
 cross-family review in a worktree before merging. Any harness text it adds
 describes only what exists and how to use it; decisions, lessons, traps and
 history go to memory.
+
+When the brain git directory exists under `${XDG_STATE_HOME:-$HOME/.local/state}`,
+the skill audits the main checkout's memory, if its directory exists, before
+searching existing guidance. It derives the key from the first entry in
+`git worktree list --porcelain`, so subdirectories and linked worktrees use
+the main checkout's memory; outside Git it uses the physical project directory.
+The projects directory honours `CLAUDE_CONFIG_DIR`, and each non-alphanumeric
+path character becomes `-`.
+
 Its injection guard covers the skill only: native memory capture and
 auto-dream bypass it, and the audit does not establish provenance.

@@ -59,7 +59,7 @@ fixture() {
   # Copy brain/gitignore when present; otherwise use the inline whitelist.
   if [ -f "$here/gitignore" ]; then cp -- "$here/gitignore" "$projects/.gitignore"
   else
-    printf '%s\n' '/*' '!/.gitignore' '!/*/' '/-tmp*/' '/*/*' '!/*/memory/' \
+    printf '%s\n' '/*' '!/.gitignore' '!/*/' '/.*/' '/-tmp*/' '/*/*' '!/*/memory/' \
       '/*/memory/**' '!/*/memory/**/' '!/*/memory/**/*.md' '/*/memory/**/.*' > "$projects/.gitignore"
   fi
   printf '%s\n' '- [Note](note.md)' > "$memory/MEMORY.md"
@@ -85,6 +85,35 @@ git -C "$projects" config brain.enabled false
 run
 if [ "$result" -eq 0 ] && ! head_oid >/dev/null && [ ! -s "$case_dir/stderr" ]; then ok 'disabled: quiet exit 0, no commit'
 else no 'disabled: quiet exit 0, no commit'; fi
+
+# A projects directory without its own repo must not inherit a parent's opt-in.
+fixture
+git init -q -b main -- "$case_dir/parent"
+git -C "$case_dir/parent" config brain.enabled true
+projects="$case_dir/parent/projects"
+mkdir -p -- "$projects"
+cp -- "$here/gitignore" "$projects/.gitignore"
+run
+if [ "$result" -eq 0 ] && ! head_oid >/dev/null \
+   && [ ! -s "$case_dir/stdout" ] && [ ! -s "$case_dir/stderr" ] \
+   && [ -z "$(git -C "$case_dir/parent" ls-files)" ]; then
+  ok 'projects inside a parent repo: quiet exit without changing the parent'
+else no 'projects inside a parent repo: quiet exit without changing the parent'; fi
+
+for branch in other detached; do
+  fixture
+  run
+  before=$(head_oid)
+  if [ "$branch" = other ]; then git -C "$projects" checkout -qb other
+  else git -C "$projects" checkout -q --detach; fi
+  printf 'Updated memory.\n' >> "$memory/note.md"
+  run
+  if [ "$result" -eq 1 ] && [ "$(head_oid)" = "$before" ] \
+     && [ "$(remote_oid)" = "$before" ] \
+     && [ "$(cat -- "$case_dir/stderr")" = 'brain: expected branch main' ]; then
+    ok "HEAD $branch: refuses with no commit or push"
+  else no "HEAD $branch: refuses with no commit or push"; fi
+done
 
 for whitelist_state in missing altered; do
   fixture
@@ -136,11 +165,11 @@ if [ "$result" -eq 0 ] && tracked -home-u-proj/memory/note.md \
 else no 'symlinked projects path: commits and pushes memory'; fi
 
 fixture
-mkdir -p -- "$memory/nested/deeper" "$memory/.hidden" "$projects/-tmp-case/memory"
+mkdir -p -- "$memory/nested/deeper" "$memory/.hidden" "$projects/-tmp-case/memory" "$projects/.hidden/memory"
 printf 'Nested.\n' > "$memory/nested/deeper/-some note.md"
 for path in '-home-u-proj/transcript.jsonl' '-home-u-proj/memory/.consolidate-lock' \
   '-home-u-proj/memory/.hidden.md' '-home-u-proj/memory/.hidden/note.md' \
-  '-home-u-proj/memory/notes.txt' '-tmp-case/memory/note.md' '.env'; do
+  '-home-u-proj/memory/notes.txt' '-tmp-case/memory/note.md' '.hidden/memory/note.md' '.env'; do
   printf 'Private non-memory content.\n' > "$projects/$path"
 done
 run
@@ -162,7 +191,6 @@ else no 'pre-staged transcript: never committed, left on disk, shared index matc
 
 for path in '-home-u-proj/transcript.jsonl' '-home-u-proj/memory/notes.txt' \
   '-home-u-proj/memory/.hidden.md' '-home-u-proj/memory/.hidden/note.md' \
-  '.hidden/memory/note.md' \
   '-home-u-proj/other/memory/note.md'; do
   fixture
   # A nested ignore file can override the top-level whitelist, but must not
@@ -269,6 +297,19 @@ before=$(head_oid)
 run
 if [ "$result" -eq 0 ] && [ "$(head_oid)" = "$before" ]; then ok 'no changes: exit 0, no new commit'
 else no 'no changes: exit 0, no new commit'; fi
+
+fixture
+mkdir -p -- "$case_dir/brain"
+cp -- "$here/commit.sh" "$here/audit.sh" "$here/gitignore" "$case_dir/brain/"
+printf 'last\tLAST_PATTERN' > "$case_dir/brain/patterns"
+printf 'LAST_PATTERN\n' >> "$memory/note.md"
+result=0
+bash "$case_dir/brain/commit.sh" "$projects" > "$case_dir/stdout" 2> "$case_dir/stderr" || result=$?
+if [ "$result" -eq 1 ] && ! head_oid >/dev/null && [ -z "$(remote_oid)" ] \
+   && grep -Fq -- 'secret (last)' "$case_dir/stderr" \
+   && ! grep -Fq -- LAST_PATTERN "$case_dir/stderr"; then
+  ok 'patterns file without final newline: last rule refuses the commit'
+else no 'patterns file without final newline: last rule refuses the commit'; fi
 
 fixture
 printf 'Unindexed.\n' > "$memory/unlisted.md"

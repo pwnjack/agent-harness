@@ -14,25 +14,35 @@ Follow these steps in order:
 1. **Evidence.** Use the user's words, a command's output, or a review finding
    you have yourself confirmed against the code. No evidence means no lesson.
 2. **Root cause.** Identify why the mistake happened, not just its symptom.
-3. **Existing guidance.** When the brain is present, run
+3. **Existing guidance.** Check for the brain git directory at
+   `${XDG_STATE_HOME:-$HOME/.local/state}/agent-brain.git`
+   (`~/.local/state/agent-brain.git` by default). When present and this
+   project's memory directory exists, run
    `~/.claude/harness/brain/audit.sh <projects-dir> <key>` on this project's
-   memory before searching. Resolve the projects directory and derive the key
-   from the current directory, replacing every non-alphanumeric character
-   with `-` (for example, `/home/u/proj` becomes `-home-u-proj`):
+   memory before searching. Derive the key from the main checkout, the first
+   entry in Git's worktree list (use the physical project directory outside
+   Git). Replace every non-alphanumeric character with `-`; `/home/u/proj`
+   becomes `-home-u-proj`:
 
    ```bash
-   projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
-   key=$(printf '%s' "$PWD" | LC_ALL=C tr -c '[:alnum:]' '-')
-   bash -- "$HOME/.claude/harness/brain/audit.sh" "$projects" "$key"
+   if [ -d "${XDG_STATE_HOME:-$HOME/.local/state}/agent-brain.git" ]; then
+     projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+     root=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+     [ -n "$root" ] || root=$(pwd -P)
+     key=$(printf '%s' "$root" | LC_ALL=C tr -c '[:alnum:]' '-')
+     if [ -d "$projects/$key/memory" ]; then
+       bash -- "$HOME/.claude/harness/brain/audit.sh" "$projects" "$key"
+     fi
+   fi
    ```
 
-   Skip the audit when the brain is absent. Search memory, the project
-   `CLAUDE.md`, project docs, skills and tests. Strengthen an existing rule
-   that was ignored, ideally into a check, rather than copying it. For a
-   lesson that recurs in memory, append today's date to
+   Skip the audit when the brain or memory directory is absent. Search memory,
+   the project `CLAUDE.md`, project docs, skills and tests. Strengthen an
+   existing rule that was ignored, ideally into a check, rather than copying
+   it. For a lesson that recurs in memory, append today's date to
    `Recurrences: YYYY-MM-DD, ...` as the last line of that memory's body;
    dates go in memory only, never in harness or project text.
-4. **Destination.** Choose exactly one destination per mistake: the first of
+4. **Destination.** Choose exactly one destination per lesson: the first of
    test/check, project doc, skill, global instruction, memory that would
    have prevented it.
    Drop task-local facts.
@@ -40,7 +50,7 @@ Follow these steps in order:
    remove personal details, host names, work information, secrets and quotes.
    This applies whatever the source: brain, work-local memory or review output.
 6. **Act by gate.** Act only at the chosen destination; print exactly one
-   `Learned:` line per mistake. Memory applies only when no higher destination
+   `Learned:` line per lesson. Memory applies only when no higher destination
    does; the rejected-proposal memory below is the sole exception.
 
    | Destination | Action |

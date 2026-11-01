@@ -33,6 +33,20 @@ audit() {
 }
 exact() { [ "$(cat -- "$tmp/output")" = "$1" ]; }
 
+# Emulate jq's older raw-output writer, which stops at an embedded NUL.
+export TEST_REAL_JQ
+TEST_REAL_JQ=$(command -v jq)
+cat > "$tmp/bin/jq" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${TEST_OLD_JQ:-0}" = 1 ]; then
+  "$TEST_REAL_JQ" "$@" | tr -d '\000'
+else
+  exec "$TEST_REAL_JQ" "$@"
+fi
+SH
+chmod +x -- "$tmp/bin/jq" || exit 1
+
 fixture
 audit
 if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then
@@ -166,5 +180,113 @@ if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/a.md: not in MEMORY.m
 ERROR -home-u-proj/memory/z.md: not in MEMORY.md'; then
   ok 'diagnostics have deterministic path order'
 else no 'diagnostics have deterministic path order'; fi
+
+fixture
+export TEST_OLD_JQ=1
+printf 'Unindexed.\n' > "$memory/a.md"
+printf 'Unindexed.\n' > "$memory/"$'z\nlast.md'
+printf 'Unindexed.\n' > "$projects/-home-u-other/memory/other.md"
+audit -home-u-proj -home-u-other -home-u-proj
+unset TEST_OLD_JQ
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-other/memory/other.md: not in MEMORY.md
+ERROR -home-u-proj/memory/a.md: not in MEMORY.md
+ERROR -home-u-proj/memory/z
+last.md: not in MEMORY.md'; then
+  ok 'older jq: all keys and newline-containing paths sorted and audited once'
+else no 'older jq: all keys and newline-containing paths sorted and audited once'; fi
+
+fixture
+printf '%s\n' '[Web](https://example.org/guide.md) [Absolute](/docs/guide.md)' \
+  '[Mail](mailto:guide.md) [Anchor](#guide.md)' >> "$memory/MEMORY.md"
+audit
+if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then
+  ok 'external and anchor links: not memory files'
+else no 'external and anchor links: not memory files'; fi
+
+fixture
+printf '%s\n' '[Missing](missing.md) [Again](./missing.md) [Again](missing.md)' >> "$memory/MEMORY.md"
+audit
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/missing.md: missing file'; then
+  ok 'duplicate relative links: one diagnostic'
+else no 'duplicate relative links: one diagnostic'; fi
+
+fixture
+audit -home-u-typo -home-u-proj
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-typo/memory/: missing memory directory'; then
+  ok 'unknown explicit key: exit 1 and name the missing memory directory'
+else no 'unknown explicit key: exit 1 and name the missing memory directory'; fi
+
+fixture
+printf 'sk-abcdefghijklmnopqrstuvwxyz012345\n' > "$tmp/linked.md"
+ln -s -- "$tmp/linked.md" "$memory/linked.md"
+printf '%s\n' '[Linked](linked.md)' >> "$memory/MEMORY.md"
+audit
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/linked.md: secret (openai)'; then
+  ok 'symlinked Markdown file: scanned for secrets'
+else no 'symlinked Markdown file: scanned for secrets'; fi
+
+for link_target in missing directory; do
+  for link_path in linked.md unlisted.md MEMORY.md nested/MEMORY.md; do
+    fixture
+    if [ "$link_target" = directory ]; then mkdir -p -- "$memory/target"; fi
+    if [ "$link_path" = MEMORY.md ]; then rm -f -- "$memory/MEMORY.md" "$memory/note.md"; fi
+    mkdir -p -- "$(dirname -- "$memory/$link_path")"
+    ln -s -- "$memory/target" "$memory/$link_path"
+    if [ "$link_path" != MEMORY.md ] && [ "$link_path" != unlisted.md ]; then
+      printf '[Linked](%s) [Again](./%s)\n' "$link_path" "$link_path" >> "$memory/MEMORY.md"
+    fi
+    audit
+    if [ "$result" -eq 1 ] && exact "ERROR -home-u-proj/memory/$link_path: symlink target is not a regular file"; then
+      ok "$link_target symlink $link_path: one clear diagnostic"
+    else no "$link_target symlink $link_path: one clear diagnostic"; fi
+  done
+done
+
+fixture
+mkdir -p -- "$tmp/audit-copy"
+cp -- "$here/audit.sh" "$tmp/audit-copy/audit.sh"
+printf 'last\tLAST_PATTERN' > "$tmp/audit-copy/patterns"
+printf 'LAST_PATTERN\n' >> "$memory/note.md"
+result=0
+bash "$tmp/audit-copy/audit.sh" "$projects" > "$tmp/output" 2>&1 || result=$?
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/note.md: secret (last)'; then
+  ok 'patterns file without final newline: last rule is scanned'
+else no 'patterns file without final newline: last rule is scanned'; fi
+
+for unreadable in note.md MEMORY.md; do
+  fixture
+  chmod 000 -- "$memory/$unreadable"
+  printf 'sk-abcdefghijklmnopqrstuvwxyz012345\n' > "$memory/z.md"
+  mkdir -p -- "$projects/-zz-later/memory"
+  printf 'sk-abcdefghijklmnopqrstuvwxyz012345\n' > "$projects/-zz-later/memory/other.md"
+  audit
+  chmod 600 -- "$memory/$unreadable"
+  if [ "$result" -eq 1 ] \
+     && grep -Fqx -- "ERROR -home-u-proj/memory/$unreadable: cannot read file" "$tmp/output" \
+     && grep -Fqx -- 'ERROR -home-u-proj/memory/z.md: secret (openai)' "$tmp/output" \
+     && grep -Fqx -- 'ERROR -zz-later/memory/other.md: secret (openai)' "$tmp/output"; then
+    ok "unreadable $unreadable: reported while remaining files and projects are scanned"
+  else no "unreadable $unreadable: reported while remaining files and projects are scanned"; fi
+done
+
+fixture
+export TEST_REAL_GREP
+TEST_REAL_GREP=$(command -v grep)
+cat > "$tmp/bin/grep" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+for arg in "$@"; do
+  case "$arg" in */memory/note.md) exit 2 ;; esac
+done
+exec "$TEST_REAL_GREP" "$@"
+SH
+chmod +x -- "$tmp/bin/grep" || exit 1
+printf 'sk-abcdefghijklmnopqrstuvwxyz012345\n' > "$memory/z.md"
+audit
+if [ "$result" -eq 1 ] \
+   && grep -Fqx -- 'ERROR -home-u-proj/memory/note.md: secret scan failed (openai)' "$tmp/output" \
+   && grep -Fqx -- 'ERROR -home-u-proj/memory/z.md: secret (openai)' "$tmp/output"; then
+  ok 'failed file scan: reported while remaining files are scanned'
+else no 'failed file scan: reported while remaining files are scanned'; fi
 
 exit "$fail"
