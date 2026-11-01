@@ -49,7 +49,7 @@ done < "$tmp/candidates"
 if "$invalid"; then exit 1; fi
 
 secret=false
-while IFS=$'\t' read -r name re; do
+while IFS=$'\t' read -r name re || [ -n "$name" ]; do
   if git grep --cached -l -z -E -e "$re" -- . > "$tmp/matches"; then
     while IFS= read -r -d '' file; do
       printf 'brain: refusing %q: secret (%s)\n' "$file" "$name" >&2
