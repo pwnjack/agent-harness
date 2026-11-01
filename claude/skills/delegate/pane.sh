@@ -143,7 +143,9 @@ invalid() {
         ("files_changed", "commands_run", "tests_run", "blockers", "concerns") as $k
           | select((.[$k] | type) != "array") | $k ] | join(" ") end end' <<<"$body" 2>/dev/null
 }
-screen() { herdr agent read "$pane" --source visible --format text 2>/dev/null | tail -n "${1:-40}"; }
+# The last lines that hold text: a tall pane ends in many blank lines, which
+# must not push the worker's last words out of the window.
+screen() { herdr agent read "$pane" --source visible --format text 2>/dev/null | awk 'NF' | tail -n "${1:-40}"; }
 # Sets st (the agent status) and seq (Herdr's completion_seq, which counts
 # finished turns whatever the focus; empty when absent or not a number).
 status() {
@@ -153,9 +155,10 @@ status() {
 }
 # Taken just before a prompt: a turn finished after it is this prompt's.
 snapshot() { status; pre=$st preseq=$seq; }
-# Checked only once the worker is idle, on the bottom of the screen, for the
-# tools' own error wording: a task that merely mentions limits must not trip it.
-quota() { screen 15 | grep -qiE "hit your usage limit|(usage|rate) limit (reached|exceeded)|not supported when using codex"; }
+# Checked only once the worker is idle, on the last 8 lines of text (a limit
+# message is followed by three or four), for the tools' own error wording: a
+# task that merely mentions limits must not trip it.
+quota() { screen 8 | grep -qiE "hit your usage limit|(usage|rate) limit (reached|exceeded)|not supported when using codex"; }
 finish() { # verdict exit-code [close]
   local kept=   # the pane stays open unless closed here or already gone
   [ "${3:-}" = close ] || [ "$1" = GONE ] || kept=' kept'

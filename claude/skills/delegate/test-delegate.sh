@@ -234,6 +234,12 @@ case "$1 $2" in
         happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*|latestart) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
+        # the limit message, the prompt box and status line, then a tall pane's blank lines
+        quotatall) st=idle
+          { echo working; echo "■ You’ve hit your usage limit. Try again at 2:22 PM."; echo "╭──────╮"; echo "│ > │"; echo "╰──────╯"; echo "  gpt-5 · 100% left"
+            for _ in $(seq 20); do echo "   "; done; } > "$S/screen" ;;
+        # the worker's own words about a limit, pushed out of the window by later text
+        quotaold) st=idle; { echo "the usage limit reached message is what we parse"; seq 10; } > "$S/screen" ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
         mentions) st=blocked
           { echo "fixing the quota check, upgrade to the new usage limit text"; seq 20; echo "Allow command? y/n"; } > "$S/screen" ;;
@@ -498,6 +504,8 @@ verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
 QUIET=0 verdict quota 5 QUOTA    yes
+QUIET=0 verdict quotatall 5 QUOTA yes # blank lines below the message do not hide it
+verdict quotaold 4 NOREPORT no # a mention above the window is not a quota hit
 LAND=0 verdict idlequota 5 QUOTA yes  # rejected before it ever started
 verdict mentions    3 BLOCKED  no     # a task that talks about limits is not a quota hit
 verdict tailmention 3 BLOCKED  no     # not even with the words at the bottom of the screen
