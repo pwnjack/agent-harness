@@ -75,7 +75,8 @@ are never traversed. An explicit key without a memory directory is an error.
 Unreadable files and scan errors are reported without stopping the remaining
 audit. Patterns need no final newline. Findings exit 1; a clean audit exits 0.
 It warns when a `MEMORY.md`
-exceeds 4096 bytes (Claude loads only the start of the index). The commit
+exceeds 4096 bytes (Claude loads only the start of the index), and when any
+other memory file exceeds 8192 bytes (one fact per file; split it). The commit
 script journals the audit after each commit; audit findings never undo a commit.
 
 Off switches, independent and history-preserving:

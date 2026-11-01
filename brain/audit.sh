@@ -105,6 +105,10 @@ audit_project() {
     fi
     if ! "$found"; then error "$path" 'not in MEMORY.md'; fi
     secrets "$file" "$path"
+    # One fact per file: a file this large has become a grab-bag to split.
+    if [ -r "$file" ] && [ "$(wc -c < "$file")" -gt 8192 ]; then
+      printf 'WARN %s/memory/%s: over 8192 bytes\n' "$key" "$path"
+    fi
   done < "$tmp/files"
 }
 
