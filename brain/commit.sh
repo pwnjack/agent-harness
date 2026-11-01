@@ -13,9 +13,23 @@ cd -- "$projects"
 # Do not discover a parent repository when the projects directory has no repo.
 [ "$(git rev-parse --show-toplevel 2>/dev/null || true)" = "$projects" ] || exit 0
 [ "$(git config --bool brain.enabled 2>/dev/null || true)" = true ] || exit 0
-[ -f "$projects/.gitignore" ] && cmp -s -- "$projects/.gitignore" "$here/gitignore" \
-  || refuse 'refusing missing or altered .gitignore whitelist'
 [ "$(git symbolic-ref -q HEAD || true)" = refs/heads/main ] || refuse 'expected branch main'
+# Reset the live whitelist before anything is staged; never follow a symlink.
+whitelist="$projects/.gitignore"
+if [ -L "$whitelist" ] || { [ -e "$whitelist" ] && [ ! -f "$whitelist" ]; }; then
+  refuse 'refusing missing or altered .gitignore whitelist'
+fi
+if ! cmp -s -- "$whitelist" "$here/gitignore"; then
+  fresh=$(mktemp "$projects/.gitignore.XXXXXX" 2>/dev/null) \
+    || refuse 'refusing missing or altered .gitignore whitelist'
+  if cp -- "$here/gitignore" "$fresh" 2>/dev/null \
+     && mv -f -- "$fresh" "$whitelist" 2>/dev/null; then
+    log 'whitelist refreshed from the harness'
+  else
+    rm -f -- "$fresh"
+    refuse 'refusing missing or altered .gitignore whitelist'
+  fi
+fi
 old=$(git rev-parse -q --verify HEAD || true)
 
 tmp=$(mktemp -d)

@@ -18,9 +18,10 @@ whitelist has changed. A re-run changes nothing else. Plain setup creates no
 brain and never enables auto-dream (it does not disable an existing setting). Never run `--brain` on a work machine.
 
 The whitelist admits only `.gitignore` and non-hidden Markdown beneath
-`*/memory/`, excluding hidden and `-tmp*` projects. Keep the installed `.gitignore`
-byte-identical to `brain/gitignore`: the commit script refuses a missing or
-altered copy and any tracked ignored file.
+`*/memory/`, excluding hidden and `-tmp*` projects. The installed `.gitignore`
+is kept byte-identical to `brain/gitignore` in the checkout the commit script
+runs from: a missing or differing copy is replaced before anything is staged,
+and the commit script refuses any tracked ignored file.
 
 The rendered service runs `brain/commit.sh <projects-dir>`. The timer fires
 two minutes after login (`OnStartupSec=2min`) and every thirty minutes
@@ -37,6 +38,13 @@ journalctl --user -u brain-commit
 
 - ignores projects directories without their own enabled repository and
   refuses a HEAD outside `main`, including detached HEADs;
+- refreshes a missing or differing `<projects>/.gitignore` from
+  `brain/gitignore` (a temporary file in the same directory, then a rename),
+  logs `brain: whitelist refreshed from the harness` and continues, so the
+  commit records the new `.gitignore` through the usual validation and scan;
+  a failed refresh, or a `.gitignore` that is a symlink, directory or other
+  non-regular file, is refused untouched with
+  `refusing missing or altered .gitignore whitelist`;
 - builds the candidate tree in a temporary index, ignoring unrelated staging;
 - refuses any candidate path other than `.gitignore` or a non-hidden
   `<key>/memory/**/*.md` outside `-tmp*`, so a nested `.gitignore` cannot

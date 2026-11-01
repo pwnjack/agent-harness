@@ -25,11 +25,13 @@ commands, including Herdr, so they never install hooks or units on the host.
   with older jq and newline-containing paths, secret diagnostics, symlinked
   files, unknown keys, unreadable files, patterns without a final newline,
   nested paths, excluded files and the 4096-byte warning.
-- `brain/test-commit.sh`: whitelist, path and secret refusals, shared-index
-  synchronisation, stale locks and concurrent updates, symlinked project
-  paths, commit identity, push URL checks, SSH deferral, push diagnostics and
-  retries, branch and parent-repository guards, hidden projects and patterns
-  without a final newline.
+- `brain/test-commit.sh`: whitelist refresh (missing, altered, loosened and
+  upstream-changed copies), refused refreshes (read-only directory, failed
+  copy, symlinked or directory `.gitignore`), path and secret refusals,
+  shared-index synchronisation, stale locks and concurrent updates, symlinked
+  project paths, commit identity, push URL checks, SSH deferral, push
+  diagnostics and retries, branch and parent-repository guards, hidden
+  projects and patterns without a final newline.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces, and the review rubric named in the delegate skill
   and kept report-only; the learning skill and its audit path exist, its

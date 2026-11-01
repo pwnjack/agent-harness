@@ -36,6 +36,14 @@ fi
 exec "$TEST_REAL_GIT" "$@"
 SH
 chmod +x -- "$tmp/bin/git" || exit 1
+real_cp=$(command -v cp)
+export TEST_REAL_CP="$real_cp"
+cat > "$tmp/bin/cp" <<'SH'
+#!/usr/bin/env bash
+if [ "${TEST_FAIL_COPY:-0}" = 1 ]; then echo 'fixture: copy failed' >&2; exit 1; fi
+exec "$TEST_REAL_CP" "$@"
+SH
+chmod +x -- "$tmp/bin/cp" || exit 1
 fail=0
 number=0
 ok() { printf 'ok   %s\n' "$1"; }
@@ -46,7 +54,7 @@ fixture() {
   export HOME="$case_dir/home" CLAUDE_CONFIG_DIR="$case_dir/claude" CODEX_HOME="$case_dir/codex"
   export XDG_STATE_HOME="$case_dir/state" XDG_CONFIG_HOME="$case_dir/config"
   export SSH_ADD_RESULT=0
-  export TEST_MOVE_BRANCH=0 TEST_FAIL_INDEX_SYNC=0
+  export TEST_MOVE_BRANCH=0 TEST_FAIL_INDEX_SYNC=0 TEST_FAIL_COPY=0
   projects="$case_dir/projects"
   remote="$case_dir/remote.git"
   memory="$projects/-home-u-proj/memory"
@@ -115,7 +123,8 @@ for branch in other detached; do
   else no "HEAD $branch: refuses with no commit or push"; fi
 done
 
-for whitelist_state in missing altered; do
+# A missing, altered or loosened live whitelist is reset before staging.
+for whitelist_state in missing altered loosened; do
   fixture
   export SSH_ADD_RESULT=1
   run
@@ -123,19 +132,108 @@ for whitelist_state in missing altered; do
   export SSH_ADD_RESULT=0
   printf 'Private transcript.\n' > "$projects/-home-u-proj/transcript.jsonl"
   printf 'Consolidation state.\n' > "$memory/.consolidate-lock"
+  printf 'Private secret.\n' > "$projects/-home-u-proj/secret.txt"
   printf 'Updated memory.\n' >> "$memory/note.md"
-  if [ "$whitelist_state" = missing ]; then
-    rm -- "$projects/.gitignore"
-  else
-    sed '1d' "$projects/.gitignore" > "$case_dir/altered-ignore"
-    mv -- "$case_dir/altered-ignore" "$projects/.gitignore"
-  fi
+  case "$whitelist_state" in
+    missing) rm -- "$projects/.gitignore" ;;
+    altered)
+      sed '1d' "$projects/.gitignore" > "$case_dir/altered-ignore"
+      mv -- "$case_dir/altered-ignore" "$projects/.gitignore"
+      ;;
+    loosened) printf '%s\n' '!/*/secret.txt' >> "$projects/.gitignore" ;;
+  esac
   run
+  if [ "$result" -eq 0 ] && [ -n "$before" ] && [ "$(count)" = 2 ] \
+     && [ "$(head_oid)" = "$(remote_oid)" ] \
+     && cmp -s -- "$projects/.gitignore" "$here/gitignore" && [ ! -L "$projects/.gitignore" ] \
+     && [ "$(git -C "$projects" show HEAD:-home-u-proj/memory/note.md)" = "$(cat -- "$memory/note.md")" ] \
+     && ! tracked -home-u-proj/secret.txt && ! tracked -home-u-proj/transcript.jsonl \
+     && ! tracked -home-u-proj/memory/.consolidate-lock \
+     && [ "$(git -C "$projects" ls-tree -r --name-only HEAD | wc -l)" -eq 3 ] \
+     && [ -z "$(find "$projects" -maxdepth 1 -name '.gitignore.*')" ] \
+     && grep -Fxq -- 'brain: whitelist refreshed from the harness' "$case_dir/stderr" \
+     && ! grep -Fq -- 'refusing' "$case_dir/stderr"; then
+    ok ".gitignore $whitelist_state: reset before staging, memory committed, private files excluded"
+  else no ".gitignore $whitelist_state: reset before staging, memory committed, private files excluded"; fi
+done
+
+# A whitelist change merged into the harness reaches the next memory commit.
+fixture
+mkdir -p -- "$case_dir/brain"
+cp -- "$here/commit.sh" "$here/audit.sh" "$here/patterns" "$here/gitignore" "$case_dir/brain/"
+result=0
+bash "$case_dir/brain/commit.sh" "$projects" > "$case_dir/stdout" 2> "$case_dir/stderr" || result=$?
+before=$(head_oid)
+printf '%s\n' '# Changed upstream.' >> "$case_dir/brain/gitignore"
+result=0
+bash "$case_dir/brain/commit.sh" "$projects" > "$case_dir/stdout" 2> "$case_dir/stderr" || result=$?
+if [ "$result" -eq 0 ] && [ -n "$before" ] && [ "$(count)" = 2 ] \
+   && [ "$(head_oid)" = "$(remote_oid)" ] \
+   && cmp -s -- "$projects/.gitignore" "$case_dir/brain/gitignore" \
+   && [ "$(git -C "$projects" show HEAD:.gitignore)" = "$(cat -- "$case_dir/brain/gitignore")" ] \
+   && [ "$(git -C "$projects" log -1 --format=%s)" = 'memory: .gitignore' ] \
+   && grep -Fxq -- 'brain: whitelist refreshed from the harness' "$case_dir/stderr"; then
+  ok 'changed tracked whitelist: refreshed, noted on stderr and committed'
+else no 'changed tracked whitelist: refreshed, noted on stderr and committed'; fi
+
+# A refresh that cannot complete keeps the old refusal and commits nothing.
+for failure in read-only copy; do
+  # Root ignores directory write permission, so only the stubbed copy fails.
+  if [ "$failure" = read-only ] && [ "$(id -u)" = 0 ]; then continue; fi
+  fixture
+  run
+  before=$(head_oid)
+  printf 'Updated memory.\n' >> "$memory/note.md"
+  printf '%s\n' '!/*/secret.txt' >> "$projects/.gitignore"
+  cp -- "$projects/.gitignore" "$case_dir/loosened-ignore"
+  if [ "$failure" = read-only ]; then chmod a-w -- "$projects"
+  else export TEST_FAIL_COPY=1; fi
+  run
+  chmod u+w -- "$projects"
+  export TEST_FAIL_COPY=0
   if [ "$result" -eq 1 ] && [ -n "$before" ] && [ "$(head_oid)" = "$before" ] \
-     && [ -z "$(remote_oid)" ] && [ ! -s "$case_dir/stdout" ] \
+     && [ "$(count)" = 1 ] && cmp -s -- "$projects/.gitignore" "$case_dir/loosened-ignore" \
+     && [ -z "$(find "$projects" -maxdepth 1 -name '.gitignore.*')" ] \
      && [ "$(cat -- "$case_dir/stderr")" = 'brain: refusing missing or altered .gitignore whitelist' ]; then
-    ok ".gitignore $whitelist_state: exit 1, no new commit, nothing pushed, one log line"
-  else no ".gitignore $whitelist_state: exit 1, no new commit, nothing pushed, one log line"; fi
+    ok "failed refresh ($failure): refused with no commit"
+  else no "failed refresh ($failure): refused with no commit"; fi
+done
+
+# A non-regular whitelist is refused and left exactly as it was.
+for kind in symlink-altered symlink-identical directory; do
+  fixture
+  run
+  before=$(head_oid)
+  printf 'Updated memory.\n' >> "$memory/note.md"
+  rm -- "$projects/.gitignore"
+  case "$kind" in
+    symlink-altered)
+      printf '%s\n' '!/*/secret.txt' > "$case_dir/target-ignore"
+      ln -s -- "$case_dir/target-ignore" "$projects/.gitignore"
+      ;;
+    symlink-identical)
+      cp -- "$here/gitignore" "$case_dir/target-ignore"
+      ln -s -- "$case_dir/target-ignore" "$projects/.gitignore"
+      ;;
+    directory) mkdir -- "$projects/.gitignore" ;;
+  esac
+  [ -f "$case_dir/target-ignore" ] && cp -- "$case_dir/target-ignore" "$case_dir/target-before"
+  run
+  if [ "$kind" = directory ]; then
+    untouched=false
+    [ -d "$projects/.gitignore" ] && [ ! -L "$projects/.gitignore" ] \
+      && [ -z "$(ls -A -- "$projects/.gitignore")" ] && untouched=true
+  else
+    untouched=false
+    [ -L "$projects/.gitignore" ] \
+      && [ "$(readlink -- "$projects/.gitignore")" = "$case_dir/target-ignore" ] \
+      && cmp -s -- "$case_dir/target-ignore" "$case_dir/target-before" && untouched=true
+  fi
+  if [ "$result" -eq 1 ] && [ -n "$before" ] && [ "$(head_oid)" = "$before" ] && "$untouched" \
+     && [ -z "$(find "$projects" -maxdepth 1 -name '.gitignore.*')" ] \
+     && [ "$(cat -- "$case_dir/stderr")" = 'brain: refusing missing or altered .gitignore whitelist' ]; then
+    ok ".gitignore $kind: refused and left untouched"
+  else no ".gitignore $kind: refused and left untouched"; fi
 done
 
 fixture
