@@ -96,7 +96,12 @@ reset hook leave the user's choice alone.
   pane kept: answer the prompt there, then close the pane and rerun the
   launch, because the brief was never sent.
 - A block in the first seconds of a resumed `--wait` is not reported.
-- Herdr's `done` is treated like `idle`.
+- Herdr's `done` is treated like `idle`. A turn can run between two polls,
+  so a prompt has landed once Herdr's `completion_seq` (finished turns,
+  whatever the focus; absent before the first) is higher than just before the
+  prompt was sent, at launch or `--resume`, in any status; no report is then
+  NOREPORT, not NOSTART. A Herdr without the field falls back to a `done` the
+  pane was not already in before the prompt.
 - The report path exists only once the worker writes it; take it from the
   first line `pane.sh` prints.
 - Pane names follow `<role>-<model>-<task>` and must match
@@ -105,9 +110,11 @@ reset hook leave the user's choice alone.
 - Placement: no column worker splits the orchestrator right; fewer than two
   splits the largest column pane; a full column fills the first `crew` tab
   (then `crew-2`…) with fewer than four panes, else creates the first unused
-  label with `herdr tab create` and starts the worker in its root pane. A
-  failing Herdr read falls back to splitting the last column pane down; a
-  failed split or tab create is NOSTART.
+  label with `herdr tab create` and starts the worker in its root pane. The
+  workspace is `HERDR_WORKSPACE_ID`, or else the prefix of `HERDR_TAB_ID`
+  (`<workspace>:<tab>`); with neither, the column stacks. A failing Herdr
+  read falls back to splitting the last column pane down; a failed split or
+  tab create is NOSTART.
 - Launches started together are placed one at a time: `pane.sh` takes
   `flock` on `.place.lock` in the handoff dir (fd 9) from just before it
   counts the column until `herdr agent start` returns, and nothing placement

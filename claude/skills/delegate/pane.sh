@@ -53,7 +53,7 @@ set -uo pipefail
 
 here=$(dirname "$(readlink -f "$0")")
 poll=${DELEGATE_POLL:-3} quiet=${DELEGATE_QUIET:-20} land=${DELEGATE_LAND:-45}
-start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' body=
+start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' body= pre= preseq= seq=
 
 CLAUDE_STANDARD="haiku sonnet opus"
 ROLES='impl|review|explore|fix'
@@ -82,7 +82,9 @@ split_largest() { # pane-in-tab candidates fallback-pane
   split_pane "$id" "$dir"
 }
 place() {
-  local cols last tabs panes i label tid ids unused=
+  local cols last tabs panes i label tid ids unused= ws=${HERDR_WORKSPACE_ID:-}
+  # Herdr tab ids are <workspace>:<tab>, so the tab names the workspace too.
+  [ -n "$ws" ] || case ${HERDR_TAB_ID:-} in ?*:*) ws=${HERDR_TAB_ID%%:*} ;; esac
   cols=$(herdr agent list 2>/dev/null | jq -c --arg tab "${HERDR_TAB_ID:-}" --arg roles "$ROLES" \
     '[.result.agents[] | select(.tab_id == $tab and ((.name // "") | test("^(" + $roles + ")-"))) | .pane_id]' 2>/dev/null) \
     && [ -n "$cols" ] || cols='[]'
@@ -92,8 +94,8 @@ place() {
     pane=$(split_largest "$last" "$cols" "$last"); return
   fi
   # Column full. Any unreadable list below falls back to stacking the column.
-  if [ -z "${HERDR_WORKSPACE_ID:-}" ] \
-     || ! tabs=$(herdr tab list 2>/dev/null | jq -r --arg ws "$HERDR_WORKSPACE_ID" \
+  if [ -z "$ws" ] \
+     || ! tabs=$(herdr tab list 2>/dev/null | jq -r --arg ws "$ws" \
           '.result.tabs[] | select(.tab_id | startswith($ws + ":")) | "\(.label)\t\(.tab_id)"' 2>/dev/null) \
      || ! panes=$(herdr pane list 2>/dev/null | jq -ec '.result.panes' 2>/dev/null); then
     pane=$(split_pane "$last" down); return
@@ -140,7 +142,15 @@ invalid() {
           | select((.[$k] | type) != "array") | $k ] | join(" ") end end' <<<"$body" 2>/dev/null
 }
 screen() { herdr agent read "$pane" --source visible --format text 2>/dev/null | tail -n "${1:-40}"; }
-status() { herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent_status // "gone"' 2>/dev/null || echo gone; }
+# Sets st (the agent status) and seq (Herdr's completion_seq, which counts
+# finished turns whatever the focus; empty when absent or not a number).
+status() {
+  read -r st seq <<<"$(herdr agent get "$pane" 2>/dev/null \
+    | jq -r '.result.agent | "\(.agent_status // "gone") \(.completion_seq // "")"' 2>/dev/null)"
+  case $seq in *[!0-9]*) seq= ;; esac
+}
+# Taken just before a prompt: a turn finished after it is this prompt's.
+snapshot() { status; pre=$st preseq=$seq; }
 # Checked only once the worker is idle, on the bottom of the screen, for the
 # tools' own error wording: a task that merely mentions limits must not trip it.
 quota() { screen 15 | grep -qiE "hit your usage limit|(usage|rate) limit (reached|exceeded)|not supported when using codex"; }
@@ -168,6 +178,7 @@ elif [ "${1:-}" = --resume ]; then
   dir=${DELEGATE_HANDOFF_DIR:-/tmp/delegate}; mkdir -p "$dir"
   report=$(newreport "resume-${pane//[^a-zA-Z0-9]/-}") || exit 2
   msg="$(cat "$3") $(ask)"
+  snapshot
   herdr agent prompt "$pane" "$msg" >/dev/null || finish GONE 6
 else
   kind=${1:-} limit=$(( 45 * 60 ))
@@ -269,6 +280,7 @@ if [ -n "$kind" ]; then
   fi
 
   msg="Read the brief at $brief and follow it exactly. $(ask)"
+  snapshot
   herdr agent prompt "$pane" "$msg" >/dev/null
 fi
 
@@ -283,7 +295,7 @@ while :; do
     herdr agent prompt "$pane" "$msg" >/dev/null; resent=1 landed=0
     sleep "$poll"; continue
   fi
-  st=$(status)
+  status
   if [ "$st" != working ] && body=$(cat "$report" 2>/dev/null) && bad=$(invalid); then
     if [ -n "$bad" ]; then
       mv -f "$report" "$report.invalid"
@@ -297,7 +309,12 @@ while :; do
              [ -n "$waiting" ] && [ "$el" -lt "$quiet" ] || finish BLOCKED 3 ;;
     gone|'') finish GONE 6 ;;
     *)  # idle/done/unknown: a report can trail the last turn, so allow a grace
-        # window; a prompt that never started is NOSTART once landing time is up
+        # window; a prompt that never started is NOSTART once landing time is up.
+        # A turn can run between two polls: a higher completion_seq than
+        # before the prompt is one, in any status. A Herdr without the field
+        # falls back to a done that was not already there.
+        if [ -n "$seq" ]; then [ "$seq" -le "${preseq:--1}" ] || landed=1
+        elif [ "$st" = done ] && [ "$pre" != done ]; then landed=1; fi
         if [ "$landed" = 1 ]; then
           quiet_since=${quiet_since:-$now}
           if [ $(( now - quiet_since )) -ge "$quiet" ]; then quota && finish QUOTA 5 close; finish NOREPORT 4; fi

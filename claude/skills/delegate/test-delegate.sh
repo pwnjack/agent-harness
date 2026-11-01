@@ -208,7 +208,11 @@ case "$1 $2" in
     n=$(( $(cat "$S/prompts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$S/prompts"; echo "$4" > "$S/msg"
     rep=${4##*write your report to }; echo "${rep%% as JSON*}" > "$S/report"
     case "$SCEN" in
-      nostart|race) ;;
+      nostart|race|resumedone|resumeseq|latestart) ;;
+      fastdone) echo done > "$S/status" ;;   # finished before the first poll, no report
+      # finished between polls in a focused pane (seen, so idle), no report
+      fastfocus) echo idle > "$S/status"; echo 1 > "$S/seq" ;;
+      fastresume) echo 4 > "$S/seq" ;;       # a new turn, still done, no report
       hooks|hooksresume) [ "$n" = 1 ] && echo "Hooks — 1 hook needs review" > "$S/screen"; echo working > "$S/status" ;;
       earlyblock) echo blocked > "$S/status" ;;
       idlequota) echo idle > "$S/status"; echo "■ You've hit your usage limit. Try again later." > "$S/screen" ;;
@@ -219,9 +223,15 @@ case "$1 $2" in
     st=$(cat "$S/status" 2>/dev/null || echo idle)
     # --wait fixture: blocked for two polls, then working
     if { [ "$SCEN" = wait ] || [ "$SCEN" = keepwait ] || [ "$SCEN" = waitclose ]; } && [ "$st" = blocked ] && [ "$g" -ge 2 ]; then st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; fi
+    # latestart fixture: idle for two polls after the prompt, then working
+    if [ "$SCEN" = latestart ] && [ "$st" = idle ] && [ "$g" -ge 3 ] && ! [ -e "$S/landed" ]; then
+      st=working g=0; echo 0 > "$S/gets"; echo working > "$S/status"; : > "$S/landed"; fi
+    # latereport fixture: the report lands on the third idle poll after the turn
+    if [ "$SCEN" = latereport ] && [ "$st" = idle ] && [ -e "$S/idle" ]; then
+      i=$(( $(cat "$S/idle") + 1 )); echo "$i" > "$S/idle"; [ "$i" -lt 3 ] || echo "$report" > "$(cat "$S/report")"; fi
     if [ "$st" = working ] && [ "$g" -ge 3 ]; then
       case "$SCEN" in
-        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*) echo "$report" > "$(cat "$S/report")"; st=idle ;;
+        happy|wait|waitclose|claude|keep|keepwait|resume|inherit|degrade|column|layout*|lock*|latestart) echo "$report" > "$(cat "$S/report")"; st=idle ;;
         # only a recovered prompt (escape, then exactly one resend) produces the report
         hooks|hooksresume) [ ! -s "$S/screen" ] && [ "$(cat "$S/prompts")" = 2 ] && { echo "$report" > "$(cat "$S/report")"; st=idle; } ;;
         quota|keepquota) st=idle; printf 'working\nYou have hit your usage limit. Try again later.\n' > "$S/screen" ;;
@@ -229,6 +239,7 @@ case "$1 $2" in
           { echo "fixing the quota check, upgrade to the new usage limit text"; seq 20; echo "Allow command? y/n"; } > "$S/screen" ;;
         tailmention) st=blocked; printf 'Run: grep "usage limit reached" pane.sh\nAllow command? y/n\n' > "$S/screen" ;;
         noreport) st=idle ;;
+        latereport) st=idle; echo 0 > "$S/idle" ;;
         # a report whose concerns field is a string instead of an array
         badreport) echo "${report/\"concerns\":[]/\"concerns\":\"x\"}" > "$(cat "$S/report")"; st=idle ;;
         extrakey) echo "${report%\}},\"extra\":1}" > "$(cat "$S/report")"; st=idle ;;
@@ -239,12 +250,17 @@ case "$1 $2" in
       esac
       echo "$st" > "$S/status"
     fi
-    echo "{\"result\":{\"agent\":{\"agent_status\":\"$st\"}}}" ;;
+    # completion_seq only once a seq file exists, as Herdr omits it before a first turn
+    echo "{\"result\":{\"agent\":{\"agent_status\":\"$st\"$(! [ -s "$S/seq" ] || echo ",\"completion_seq\":$(cat "$S/seq")")}}}" ;;
 esac
 STUB
 chmod +x "$tmp/bin/herdr"
 
 # verdict <scenario> <want-exit> <want-first-word> <want-pane-closed:yes|no> [pane.sh args...]
+# The stub moves on per poll, not per second, so polls are short. The landing
+# and quiet windows are generous, so load never trips them; a case that must
+# reach one sets LAND=0 or QUIET=0. TAB and WS override the caller's tab and
+# workspace (WS= for none).
 verdict() {
   local sc=$1 want=$2 word=$3 close=$4; shift 4
   local st="$tmp/state-$sc" out rc closed=no
@@ -253,9 +269,11 @@ verdict() {
   [ "$sc" = wait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/w.json" > "$st/report"; }
   [ "$sc" = keepwait ] && { echo blocked > "$st/status"; echo "$tmp/handoff/kw.json" > "$st/report"; }
   [ "$sc" = waitclose ] && { echo blocked > "$st/status"; echo "$tmp/handoff/wc.json" > "$st/report"; }
-  out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
+  [ "$sc" = resumedone ] && echo done > "$st/status"   # the previous round's turn, unseen
+  case $sc in fastresume|resumeseq) echo done > "$st/status"; echo 3 > "$st/seq" ;; esac
+  out=$(env SCEN="$sc" STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID="${TAB:-t0}" HERDR_WORKSPACE_ID="${WS-wD}" \
     DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="${CACHE:-$tmp/real.json}" CODEX_CONFIG="$tmp/config-ok.toml" \
-    DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 DELEGATE_KEEP="${KEEP:-}" \
+    DELEGATE_POLL=0.01 DELEGATE_QUIET="${QUIET:-30}" DELEGATE_LAND="${LAND:-30}" DELEGATE_KEEP="${KEEP:-}" \
     "$here/pane.sh" "$@" 2>/dev/null); rc=$?
   [ -e "$st/closed" ] && closed=yes
   if [ "$rc" = "$want" ] && [ "${out%% *}" = "$word" ] && [ "$closed" = "$close" ]; then echo "ok   pane $sc -> $word"
@@ -275,12 +293,12 @@ then echo "ok   pane codex: launched with the resolved model"; else echo "FAIL p
 if grep -A1 -x -- --cwd "$tmp/state-happy/split" | tail -1 | grep -qxF -- "$PWD"
 then echo "ok   pane split: opens in the caller's directory"; else echo "FAIL pane split: args $(cat "$tmp/state-happy/split")"; fail=1; fi
 # Claude workers start with Superpowers and the advisor disabled and HARNESS_LEAF set.
-# Codex launch arguments omit Superpowers settings.
 if grep -A1 -x -- --settings "$tmp/state-claude/start" | tail -1 \
      | jq -e '.enabledPlugins["superpowers@anthropic-plugin-directory"] == false
               and .env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL == "1"
               and .env.HARNESS_LEAF == "1"' >/dev/null 2>&1
 then echo "ok   claude worker launch: advisor disabled and leaf marked"; else echo "FAIL claude worker launch: missing worker settings"; fail=1; fi
+# Codex launch arguments omit Superpowers settings.
 if ! grep -q superpowers "$tmp/state-happy/start"
 then echo "ok   pane codex: launch arguments omit Superpowers settings"; else echo "FAIL pane codex: unexpected Superpowers launch setting"; fail=1; fi
 missing=
@@ -311,7 +329,7 @@ then echo "ok   pane column: splits the last delegate in this tab"; else echo "F
 # checks the recorded `pane split` or `tab create` arguments.
 fx_dir() { mkdir -p "$tmp/state-layout-$1"; echo "$tmp/state-layout-$1"; }
 fx_agents() { local d=$1; shift   # column workers, by pane
-  jq -n '{result:{agents:[$ARGS.positional[] | {tab_id:"t0", pane_id:., name:("review-sol-" + .)}]}}' --args "$@" > "$d/agents"; }
+  jq -n --arg t "${TAB:-t0}" '{result:{agents:[$ARGS.positional[] | {tab_id:$t, pane_id:., name:("review-sol-" + .)}]}}' --args "$@" > "$d/agents"; }
 fx_tabs() { local d=$1; shift     # "<tab_id>=<label>"
   jq -n '{result:{tabs:[$ARGS.positional[] | split("=") | {tab_id:.[0], label:.[1]}]}}' --args "$@" > "$d/tabs"; }
 fx_panes() { local d=$1; shift    # "<tab_id>=<pane>"
@@ -355,6 +373,15 @@ d=$(fx_dir crew2); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t2=crew wD:t3=crew-2
 fx_panes "$d" wD:t2=pa wD:t2=pb wD:t2=pc wD:t2=pd wD:t3=pq1 wD:t3=pq2; fx_layout "$d" pq1:109:66 pq2:109:66; launch crew2
 recorded "crew-2 with room is used" "$d" split "pane split --pane pq1 --direction down $common"
 
+# crew closed while crew-2 is full: the new tab takes the lowest free label
+d=$(fx_dir crewlow); fx_agents "$d" p9 p8; fx_tabs "$d" wD:t3=crew-2; fx_panes "$d" wD:t3=pa wD:t3=pb wD:t3=pc wD:t3=pd
+fx_layout "$d" pa:109:33 pb:109:33 pc:109:33 pd:109:33; launch crewlow
+recorded "crew absent, crew-2 full: reopens crew" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+
+# no HERDR_WORKSPACE_ID: the tab id names the workspace, so the column still overflows
+d=$(fx_dir nows); TAB=wD:t0 fx_agents "$d" p9 p8; TAB=wD:t0 WS= launch nows
+recorded "no workspace id: overflows into crew" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
+
 d=$(fx_dir otherws); fx_agents "$d" p9 p8; fx_tabs "$d" wE:t2=crew; fx_panes "$d" wE:t2=px; fx_layout "$d" px:219:66; launch otherws
 recorded "other workspace's crew ignored" "$d" tabcreate "tab create --label crew --cwd $PWD --no-focus --env HARNESS_ROLE=impl "
 
@@ -386,7 +413,7 @@ st=$tmp/state-race; mkdir -p "$st" "$tmp/handoff-race"
 for t in lk1 lk2 lk3; do
   env SCEN=race STATE="$st" PATH="$tmp/bin:$PATH" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
     DELEGATE_HANDOFF_DIR="$tmp/handoff-race" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
-    DELEGATE_POLL=0.1 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
+    DELEGATE_POLL=0.01 DELEGATE_LAND=0 "$here/pane.sh" codex sol medium impl "$t" "$b" >/dev/null 2>&1 &
 done
 wait
 rid=$(awk '$2 == "p0" && $3 == "right" { print $4 }' "$st/placements" 2>/dev/null)
@@ -405,13 +432,14 @@ lockrun() {
   mkdir -p "$tmp/state-$1"
   env SCEN="$1" STATE="$tmp/state-$1" PATH="${LPATH:-$tmp/bin:$PATH}" HERDR_ENV=1 HERDR_PANE_ID=p0 HERDR_TAB_ID=t0 HERDR_WORKSPACE_ID=wD \
     DELEGATE_HANDOFF_DIR="$tmp/handoff" CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" \
-    DELEGATE_POLL=0.1 DELEGATE_QUIET=2 DELEGATE_LAND=3 "$here/pane.sh" codex sol medium impl "t-$1" "$b" 2>/dev/null
+    DELEGATE_POLL=0.01 DELEGATE_QUIET=30 DELEGATE_LAND=30 "$here/pane.sh" codex sol medium impl "t-$1" "$b" 2>/dev/null
 }
 # lockhold: a background process holding the lock until killed; sets $holder.
 lockhold() {
   rm -f "$tmp/held"
   ( exec 8>>"$lockfile"; flock 8 && : > "$tmp/held"; exec sleep 30 ) & holder=$!
-  until [ -e "$tmp/held" ]; do sleep 0.05; done
+  for _ in $(seq 400); do [ -e "$tmp/held" ] && return; sleep 0.05; done
+  echo "FAIL lock: test holder never took the lock"; fail=1
 }
 # lockfree: whether the lock can be taken at once
 lockfree() { flock -n "$lockfile" true; }
@@ -434,7 +462,7 @@ kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
 
 # Without flock on PATH the launch proceeds, silently.
 farm=$tmp/noflock; mkdir -p "$farm"
-for f in /usr/bin/* /bin/*; do [ -L "$farm/${f##*/}" ] || [ "${f##*/}" = flock ] || ln -s "$f" "$farm/${f##*/}"; done
+ln -s /usr/bin/* /bin/* "$farm" 2>/dev/null; rm -f "$farm/flock"   # the first of a name wins
 out=$(LPATH="$tmp/bin:$farm" lockrun locknoflock)
 if [ "${out%% *}" = REPORT ] && ! grep -q 'placement lock' <<<"$out" && ! [ -e "$farm/flock" ]
 then echo "ok   lock: no flock on PATH: the launch proceeds"; else echo "FAIL lock: launch without flock gave '${out%% *}'"; fail=1; fi
@@ -442,7 +470,7 @@ then echo "ok   lock: no flock on PATH: the launch proceeds"; else echo "FAIL lo
 # Released on every path: the next launch could take the lock at once.
 verdict lockfree 0 REPORT yes
 lockfree && echo "ok   lock: released after launch" || { echo "FAIL lock: still held after a launch"; fail=1; }
-verdict nostart 7 NOSTART no
+LAND=0 verdict nostart 7 NOSTART no
 lockfree && echo "ok   lock: released after a NOSTART launch" || { echo "FAIL lock: still held after NOSTART"; fail=1; }
 verdict startfail 7 NOSTART yes
 lockfree && echo "ok   lock: released after a failed start" || { echo "FAIL lock: still held after a failed start"; fail=1; }
@@ -464,12 +492,20 @@ lockfree && echo "ok   lock: a long-lived child of agent start does not keep the
 verdict hooks       0 REPORT   yes    # hook-review Escape and resend
 if [ "$(cat "$tmp/state-hooks/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tmp/state-hooks/prompts")" = 2 ]
 then echo "ok   pane hooks: one escape, one resend"; else echo "FAIL pane hooks: escape/resend not as expected"; fail=1; fi
-verdict quota       5 QUOTA    yes
-verdict idlequota   5 QUOTA    yes    # rejected before it ever started
+QUIET=0 verdict quota 5 QUOTA    yes
+LAND=0 verdict idlequota 5 QUOTA yes  # rejected before it ever started
 verdict mentions    3 BLOCKED  no     # a task that talks about limits is not a quota hit
 verdict tailmention 3 BLOCKED  no     # not even with the words at the bottom of the screen
 verdict earlyblock  3 BLOCKED  no     # an approval question before the first poll
-verdict noreport    4 NOREPORT no
+QUIET=0 verdict noreport 4 NOREPORT no
+# Inside the windows: a prompt that starts a few polls late is not NOSTART, and
+# a report that trails the last turn by a few polls is REPORT, not NOREPORT.
+verdict latestart  0 REPORT   yes
+verdict latereport 0 REPORT   yes
+# A worker that finished before the first poll worked: NOREPORT, not NOSTART.
+LAND=1 QUIET=0 verdict fastdone 4 NOREPORT no
+# Herdr's completion_seq rose: landed, though the focused pane reads idle.
+LAND=0 QUIET=0 verdict fastfocus 4 NOREPORT no
 # A malformed report is no report: moved aside so a --wait after re-prompting
 # waits for a fresh one, and the reason is printed.
 for sc in badreport extrakey twoobjects; do
@@ -478,11 +514,11 @@ for sc in badreport extrakey twoobjects; do
   if [ ! -e "$bad" ] && [ -s "$bad.invalid" ]
   then echo "ok   pane $sc: moved to .invalid"; else echo "FAIL pane $sc: not moved aside"; fail=1; fi
 done
-verdict truncreport 4 NOREPORT no
+QUIET=0 verdict truncreport 4 NOREPORT no
 bad=$(cat "$tmp/state-truncreport/report")
 if [ -e "$bad" ] && [ ! -e "$bad.invalid" ]
 then echo "ok   pane truncreport: left in place, not judged"; else echo "FAIL pane truncreport: judged a partial write"; fail=1; fi
-verdict nostart     7 NOSTART  no
+LAND=0 verdict nostart 7 NOSTART  no
 verdict gate        7 NOSTART  no
 verdict splitfail   7 NOSTART  no
 verdict trustblock  3 BLOCKED  no    # a first-run trust prompt stays answerable
@@ -503,15 +539,20 @@ if [ "$(cat "$tmp/state-hooksresume/keys" 2>/dev/null)" = esc ] && [ "$(cat "$tm
 then echo "ok   pane resume hooks: one escape, one resend"; else echo "FAIL pane resume hooks: not recovered"; fail=1; fi
 # Two resumes of one pane in the same second get different report paths.
 uniq_report() { mkdir -p "$tmp/state-uniq"; env PATH="$tmp/bin:$PATH" STATE="$tmp/state-uniq" SCEN=nostart HERDR_ENV=1 \
-  DELEGATE_HANDOFF_DIR="$tmp/handoff" DELEGATE_LAND=0 DELEGATE_POLL=0.1 \
+  DELEGATE_HANDOFF_DIR="$tmp/handoff" DELEGATE_LAND=0 DELEGATE_POLL=0.01 \
   "$here/pane.sh" --resume p1 "$tmp/fix.md" 2>/dev/null | head -1 | grep -o 'report=[^ ]*'; }
 r1=$(uniq_report); r2=$(uniq_report)
 if [ -n "$r1" ] && [ "$r1" != "$r2" ]; then echo "ok   pane resume: a unique report path each time"
 else echo "FAIL pane resume: report paths '$r1' and '$r2'"; fail=1; fi
+# A pane already done from its previous round has not taken the new prompt.
+LAND=0 QUIET=0 verdict resumedone 7 NOSTART no --resume p1 "$tmp/fix.md"
+# With completion_seq: a new turn on a done pane landed; an unchanged one did not.
+LAND=0 QUIET=0 verdict fastresume 4 NOREPORT no --resume p1 "$tmp/fix.md"
+LAND=0 QUIET=0 verdict resumeseq 7 NOSTART no --resume p1 "$tmp/fix.md"
 check "$(gate --resume p1 /nonexistent)"           2 "resume needs a readable message"
 check "$(gate --resume p1)"                        2 "resume needs a message file"
 KEEP=1 verdict keep      0 REPORT  no     # kept open for a fix round
 KEEP=1 verdict keepwait  0 REPORT  no --wait p1 "$tmp/handoff/kw.json"   # and again after the round
-KEEP=1 verdict keepquota 5 QUOTA   yes    # a pane out of quota is closed regardless
+KEEP=1 QUIET=0 verdict keepquota 5 QUOTA yes    # a pane out of quota is closed regardless
 
 exit $fail
