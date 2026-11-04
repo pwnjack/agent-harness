@@ -125,7 +125,9 @@ effort from the verdict line.
 ## After any worker
 
 Read the diff and re-run the verification commands yourself: a worker's
-`tests_run` is a claim, not evidence. Nothing is committed unless the user asks.
+`tests_run` is a claim, not evidence, and so is any statement about existing
+code ("the form already sends it"): check those the change depends on.
+Nothing is committed unless the user asks.
 
 ## Superpowers
 
