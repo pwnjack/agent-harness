@@ -31,7 +31,9 @@ budget "$repo/codex/AGENTS.global.md" "$BUDGET_AGENTS_GLOBAL" \
   "budget: AGENTS.global.md <= $BUDGET_AGENTS_GLOBAL"
 
 # This is a textual guard, not a shell parser; diagnostics retain file and line.
-pattern='(^|[[:space:];|&()])(sed[[:space:]]+([^;|&]*[[:space:]])?(-[[:alpha:]]*i|--in-place([=[:space:];|&()]|$))|date[[:space:]]+([^;|&]*[[:space:]])?-d|stat[[:space:]]+([^;|&]*[[:space:]])?-c|find[[:space:]]+([^;|&]*[[:space:]])?-printf|chmod[[:space:]]+([^;|&]*[[:space:]])?--reference|basename[[:space:]]+([^;|&]*[[:space:]])?-a|mapfile([[:space:];|&()]|$)|(declare|local)[[:space:]]+([^;|&]*[[:space:]])?-[[:alpha:]]*A)|`'
+# The sed hex-escape arm (an odd run of backslashes before x, so an escaped
+# backslash is not one) scans past ; because sed scripts join commands with it.
+pattern='(^|[[:space:];|&()])(sed[[:space:]]+([^|&]*[^|&\\])?(\\\\)*\\x[0-9a-fA-F]{2}|sed[[:space:]]+([^;|&]*[[:space:]])?(-[[:alpha:]]*i|--in-place([=[:space:];|&()]|$))|date[[:space:]]+([^;|&]*[[:space:]])?-d|stat[[:space:]]+([^;|&]*[[:space:]])?-c|find[[:space:]]+([^;|&]*[[:space:]])?-printf|chmod[[:space:]]+([^;|&]*[[:space:]])?--reference|basename[[:space:]]+([^;|&]*[[:space:]])?-a|mapfile([[:space:];|&()]|$)|(declare|local)[[:space:]]+([^;|&]*[[:space:]])?-[[:alpha:]]*A)|`'
 scan_shell() {
   # Strip shell comments, retaining line numbers and quoted hashes. Only
   # executable backticks count: quoted literals and escaped ones are harmless.
@@ -100,6 +102,21 @@ printf '%s' '#'; sed -ni 'p' file
 SH
 check_portability 'portable sed' 1 <<'SH'
 sed -nE 's/a/b/p' file
+SH
+check_portability 'sed hex escape' 0 <<'SH'
+strip() { sed 's/\x1b\[[0-9;]*m//g'; }
+SH
+check_portability 'sed with an ANSI-C quoted escape' 1 <<'SH'
+strip() { sed $'s/\e\\[[0-9;]*m//g'; }
+SH
+check_portability 'hex escape before a pipe into sed' 1 <<'SH'
+printf '\x1b' | sed 's/a/b/'
+SH
+check_portability 'hex escape after ; inside a sed script' 0 <<'SH'
+sed -e 's/a/b/;s/\x1b//g' file
+SH
+check_portability 'escaped backslash before x in sed' 1 <<'SH'
+sed 's/\\x1b/literal/' file
 SH
 for command in 'sed -i x file' 'date -d yesterday' 'stat -c %a file' \
   'find . -printf %p' 'chmod --reference=file other' 'basename -a a b' \
