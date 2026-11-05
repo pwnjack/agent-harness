@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Claude Code status line — model, effort, context, 5h/7d rate limits.
+# Claude Code status line — model, effort, context, prompt cache, 5h/7d rate
+# limits with the weekly pace.
 # Adapted from https://github.com/fedddorov/claude-code-status-bar (MIT).
 # Wire up in ~/.claude/settings.json:
 #   "statusLine": {"type": "command", "command": "bash ~/.claude/harness/claude/statusline.sh"}
@@ -7,7 +8,8 @@
 time_locale=${LC_ALL:-${LC_TIME:-${LANG:-C}}}
 export LC_ALL=C   # Use the C locale for numeric formatting.
 input=$(cat)
-IFS=$'\x1f' read -r model effort cwd used total win fiveh fiveh_at week week_at < <(
+IFS=$'\x1f' read -r model effort cwd used total win cache_seen cache_warm cache_at cache_cold_tok \
+  fiveh fiveh_at week week_at < <(
   jq -r '[
     (.model.display_name // "" | sub(" *\\(.*\\)$"; "")),
     (.effort.level // ""),
@@ -16,6 +18,10 @@ IFS=$'\x1f' read -r model effort cwd used total win fiveh fiveh_at week week_at 
     (.context_window | if .total_input_tokens == null and .total_output_tokens == null then ""
        else (.total_input_tokens // 0) + (.total_output_tokens // 0) end),
     (.context_window.context_window_size // 0 | if . > 0 then floor else "" end),
+    (if .prompt_cache.caching_observed == true then 1 else "" end),
+    (if .prompt_cache.warm == true then 1 else "" end),
+    (.prompt_cache.expires_at // ""),
+    (.prompt_cache.recache_tokens_if_cold // ""),
     (.rate_limits.five_hour.used_percentage // ""),
     (.rate_limits.five_hour.resets_at // ""),
     (.rate_limits.seven_day.used_percentage // ""),
@@ -47,6 +53,10 @@ hue() { awk -v p="$1" -v g="$GRN" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(
 hue_ctx() { awk -v p="$1" -v g="$BLU" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(p>=85)print r;else if(p>=70)print o;else if(p>=50)print y;else print g}'; }
 # reasoning-effort color: green = low, yellow = medium, orange = high, red = xhigh, purple = max
 hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high) echo "$ORG";; xhigh) echo "$RED";; max) echo "$MAG";; *) echo "$DIM";; esac; }
+# prompt-cache color by seconds left before the prefix goes cold: green > 15 min, yellow > 5 min, orange after
+hue_cache() { awk -v t="$1" -v now="$(date +%s)" -v g="$GRN" -v y="$YEL" -v o="$ORG" 'BEGIN{s=t-now;if(s>900)print g;else if(s>300)print y;else print o}'; }
+# weekly-pace color: dim within 5 points of the elapsed week, yellow > 5 ahead, orange > 15 ahead
+hue_pace() { awk -v d="$1" -v n="$DIM" -v y="$YEL" -v o="$ORG" 'BEGIN{if(d>15)print o;else if(d>5)print y;else print n}'; }
 
 # FiraCode's own progress bar (U+EE00-EE05): an outlined, round-ended bar
 # whose cells fill from the left. Empty left/middle/right, then filled
@@ -80,7 +90,11 @@ pie() {
   printf '%s%s%s' "$2" "${PIE[$k]}" "$R"
 }
 
-# rate-limit segment: label, percent, reset epoch
+# prompt cache: nf-md-fire (U+F0238) while the cached prefix is warm,
+# nf-md-snowflake (U+F0717) once it has gone cold, encoded as UTF-8 bytes.
+FIRE=$'\xf3\xb0\x88\xb8'
+SNOW=$'\xf3\xb0\x9c\x97'
+
 # clock time of an epoch, with the weekday when it is not today; 12 h when
 # options/clock says so, like the bar and the desktop clock
 fmt_at() {
@@ -90,10 +104,18 @@ fmt_at() {
   LC_ALL=$time_locale date -d "@$1" +"$f"
 }
 
+# rate-limit segment: label, percent, reset epoch, pace delta (7d only)
 limit() {
   local c; c=$(hue "$2")
   printf '%s%s%s %s %s%.0f%%%s' "$DIM" "$1" "$R" "$(bar "$2" "$c")" "$c" "$2" "$R"
-  [ -n "$3" ] && printf ' %s%s · %s%s' "$DIM" "$(fmt_left "$3")" "$(fmt_at "$3")" "$R"
+  [ -n "$4" ] && printf ' %s%s%s' "$(hue_pace "$4")" "$4" "$R"
+  [ -n "$3" ] && printf ' %s%s%s · %s%s' "$DIM" "${4:+· }" "$(fmt_left "$3")" "$(fmt_at "$3")" "$R"
+}
+
+# weekly pace: used percent minus the elapsed share of the 7-day window, as a
+# signed whole number; +6 means usage runs six points ahead of the clock.
+pace() {
+  awk -v u="$1" -v t="$2" -v now="$(date +%s)" 'BEGIN{e=(1-(t-now)/604800)*100;if(e<0)e=0;if(e>100)e=100;d=u-e;if(d>-0.5&&d<0.5)d=0;printf"%+.0f",d}'
 }
 
 sep="${DIM} │ ${R}"
@@ -114,8 +136,24 @@ if [ -n "$used" ]; then
   parts+=("$ctx")
 fi
 
+# Prompt cache, once a response has reported cache tokens: the flame with the
+# time until the prefix goes cold, or the snowflake with the tokens the next
+# request re-caches. Booleans are compared in jq: its // would drop false. An
+# expiry already behind us is cold, whatever the last render's warm said.
+if [ -n "$cache_seen" ]; then
+  if [ -n "$cache_warm" ] && [ -n "$cache_at" ] && [ "${cache_at%.*}" -gt "$(date +%s)" ] 2>/dev/null; then
+    cc=$(hue_cache "$cache_at")
+    parts+=("${cc}${FIRE}${R} ${cc}$(fmt_left "$cache_at")${R}")
+  else
+    parts+=("${BLU}${SNOW}${R}${cache_cold_tok:+ ${DIM}$(fmt_tok "$cache_cold_tok")${R}}")
+  fi
+fi
+
 [ -n "$fiveh" ] && parts+=("$(limit 5h "$fiveh" "$fiveh_at")")
-[ -n "$week" ]  && parts+=("$(limit 7d "$week" "$week_at")")
+if [ -n "$week" ]; then
+  wp=""; [ -n "$week_at" ] && wp=$(pace "$week" "$week_at")
+  parts+=("$(limit 7d "$week" "$week_at" "$wp")")
+fi
 
 out=""
 for p in "${parts[@]}"; do out="${out:+$out$sep}$p"; done

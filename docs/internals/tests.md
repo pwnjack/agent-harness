@@ -34,7 +34,9 @@ commands, including Herdr, so they never install hooks or units on the host.
   projects and patterns without a final newline.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces, and the review rubric named in the delegate skill
-  and kept report-only; the learning skill and its audit path exist, its
+  and kept report-only; the global instructions name the delegate, wrap-up
+  and handover skills; wrap-up names handover and the learning skill, and
+  handover names its six parts; the learning skill and its audit path exist, its
   example honours the brain-present gate and config paths, derives the key
   from the repository root in subdirectories, and propagates audit failures.
 - `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in

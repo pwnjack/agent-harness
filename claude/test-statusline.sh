@@ -63,4 +63,40 @@ elapsed=$(jq -n --argjson s "$start" 'now - $s')
 if jq -en --argjson e "$elapsed" '$e <= 1' >/dev/null; then ok "hung herdr: status line prints within 1 s"
 else no "hung herdr: status line prints within 1 s (took ${elapsed} s)"; fi
 
+# Prompt cache and weekly pace, read from the status JSON alone.
+strip() { sed $'s/\e\\[[0-9;]*m//g'; }   # a literal ESC: BSD sed has no \x1b
+now=$(date +%s)
+FIRE=$'\xf3\xb0\x88\xb8' SNOW=$'\xf3\xb0\x9c\x97'
+base=$(jq -n --arg d "$tmp/proj" --argjson n "$now" '{model:{display_name:"Opus 5.5"},workspace:{current_dir:$d},
+  rate_limits:{seven_day:{used_percentage:44,resets_at:($n+302400)}}}')
+line() { jq "$@" <<<"$base" | bash "$statusline" | strip; }
+
+out=$(line --argjson n "$now" '.prompt_cache={caching_observed:true,warm:true,expires_at:($n+2550),recache_tokens_if_cold:174945}')
+case $out in *"│ $FIRE 42m │"*) ok "warm cache: flame with the time left";; *) no "warm cache: flame with the time left: $out";; esac
+out=$(line '.prompt_cache={caching_observed:true,warm:false,expires_at:null,recache_tokens_if_cold:174945}')
+case $out in *"│ $SNOW 175k │"*) ok "cold cache: snowflake with the tokens to re-cache";; *) no "cold cache: snowflake with the tokens to re-cache: $out";; esac
+out=$(line '.prompt_cache={caching_observed:true,warm:false,expires_at:null,recache_tokens_if_cold:null}')
+case $out in *"│ $SNOW │"*) ok "cold cache after a compaction: snowflake alone";; *) no "cold cache after a compaction: snowflake alone: $out";; esac
+out=$(line --argjson n "$now" '.prompt_cache={caching_observed:true,warm:true,expires_at:($n-30),recache_tokens_if_cold:174945}')
+case $out in *"│ $SNOW 175k │"*) ok "warm flag with a past expiry renders cold";; *) no "warm flag with a past expiry renders cold: $out";; esac
+out=$(line '.prompt_cache={caching_observed:false,warm:false,expires_at:null}')
+case $out in *"$FIRE"*|*"$SNOW"*) no "caching not observed: no cache segment: $out";; *) ok "caching not observed: no cache segment";; esac
+out=$(line '.')
+case $out in *"$FIRE"*|*"$SNOW"*) no "no prompt_cache block: no cache segment: $out";; *) ok "no prompt_cache block: no cache segment";; esac
+
+# 44 % used with half the week gone: six points behind the clock.
+case $out in *"44% -6 · "*) ok "weekly pace: used minus elapsed, before the reset";; *) no "weekly pace: used minus elapsed, before the reset: $out";; esac
+out=$(line --argjson n "$now" '.rate_limits.seven_day={used_percentage:75,resets_at:($n+302400)}')
+case $out in *"75% +25 · "*) ok "weekly pace ahead of the clock is signed";; *) no "weekly pace ahead of the clock is signed: $out";; esac
+out=$(line --argjson n "$now" '.rate_limits.seven_day={used_percentage:49.8,resets_at:($n+302400)}')
+case $out in *"50% +0 · "*) ok "weekly pace within half a point prints +0";; *) no "weekly pace within half a point prints +0: $out";; esac
+# A reset already behind us counts as a full week elapsed; one more than a
+# week away as none.
+out=$(line --argjson n "$now" '.rate_limits.seven_day={used_percentage:44,resets_at:($n-86400)}')
+case $out in *"44% -56 · "*) ok "weekly pace clamps a past reset to a full week";; *) no "weekly pace clamps a past reset to a full week: $out";; esac
+out=$(line --argjson n "$now" '.rate_limits.seven_day={used_percentage:44,resets_at:($n+691200)}')
+case $out in *"44% +44 · "*) ok "weekly pace clamps a far reset to nothing elapsed";; *) no "weekly pace clamps a far reset to nothing elapsed: $out";; esac
+out=$(line '.rate_limits.seven_day={used_percentage:44}')
+case $out in *"44% -"*|*"44% +"*) no "weekly pace needs the reset time: $out";; *"7d"*"44%"*) ok "weekly pace needs the reset time";; *) no "weekly pace needs the reset time: $out";; esac
+
 exit "$fail"
