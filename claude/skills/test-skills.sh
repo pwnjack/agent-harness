@@ -137,6 +137,22 @@ done < <(grep -rhoE '~/\.claude/skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE
 [ "$missing" = 0 ] && ok "every referenced skill file exists" || fail=1
 check "global instructions name an existing skill" \
   bash -c 'grep -q "\`delegate\` skill" "$1" && test -f "$2/delegate/SKILL.md"' _ "$claude/CLAUDE.global.md" "$here"
+for skill in wrap-up handover; do
+  check "global instructions name the $skill skill, and it exists" \
+    bash -c 'grep -q "\`$2\` skill" "$1" && test -f "$3/$2/SKILL.md"' _ "$claude/CLAUDE.global.md" "$skill" "$here"
+done
+
+# --- session end: wrap-up records through handover, handover has its parts ---
+check "wrap-up: names the handover and compound-learning skills" \
+  bash -c 'grep -q "\`handover\` skill" "$1" && grep -q "\`compound-learning\` skill" "$1"' \
+  _ "$here/wrap-up/SKILL.md"
+check "wrap-up: never pkill -f, and only this session's items" \
+  bash -c 'grep -q "Never \`pkill -f\`" "$1" && grep -q "only what this session made" "$1"' \
+  _ "$here/wrap-up/SKILL.md"
+check "handover: the six parts in order" \
+  bash -c 'printf "%s\n" State "Shipped this session" Decisions Next Leftovers "Pending from the user" > "$2/parts"
+    grep -oE "^[1-6]\. \*\*[^.]+\.\*\*" "$1" | sed -E "s/^[1-6]\. \*\*(.*)\.\*\*$/\1/" | cmp -s - "$2/parts"' \
+  _ "$here/handover/SKILL.md" "$tmp"
 
 # --- the review rubric the delegate skill hands to every reviewer --------------
 # shellcheck disable=SC2088  # a literal ~ path, matched as text

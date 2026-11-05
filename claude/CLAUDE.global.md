@@ -30,3 +30,8 @@ it and how.
 Evidence before assertions. A worker's test claims are not evidence; re-run the
 verification commands yourself before calling anything done, and chain a commit
 to them with `&&` so a failing check stops it.
+
+## Session end
+
+When the user ends the session, in any words, run the `wrap-up` skill. To
+pass work on without ending the session, run the `handover` skill.
