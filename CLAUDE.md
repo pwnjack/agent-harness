@@ -27,8 +27,10 @@ runs the same checks against a private export of the staged tree.
 
 Scripts use `#!/usr/bin/env bash` and `set -euo pipefail`; tests use
 `set -uo pipefail`. Target Bash 3.2 and jq. Avoid `mapfile`, associative arrays
-(`declare -A`, `local -A`) and non-portable flags such as `sed -i`, `date -d`,
-`stat -c`, `find -printf`, `chmod --reference` and `basename -a`.
+(`declare -A`, `local -A`), non-portable flags such as `sed -i`, `date -d`,
+`stat -c`, `find -printf`, `chmod --reference` and `basename -a`, and `\x`
+escapes in sed expressions (BSD sed reads them literally; quote an ANSI-C
+`$'\e'` instead).
 Pass paths that may start with `-` after `--`. Iterate over tracked files
 with `git ls-files -z` and `while IFS= read -r -d ''`.
 
