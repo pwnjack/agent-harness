@@ -85,9 +85,16 @@ in `docs/superpowers/` stay local and untracked.
 ## Status lines and sidebar
 
 `claude/statusline.sh` prints the model and effort, the context as a one-cell
-pie with token counts, and the 5-hour and 7-day limits as FiraCode progress
-bars with their reset times (12 h or 24 h, following `options/clock` when the
-dotfiles provide it). Codex shows the same fields from `codex/statusline.toml`,
+pie with token counts, the prompt cache, and the 5-hour and 7-day limits as
+FiraCode progress bars with their reset times (12 h or 24 h, following
+`options/clock` when the dotfiles provide it). The prompt cache appears once a
+response has reported cache tokens: a flame with the time left before the
+cached prefix goes cold, or a snowflake with the tokens the next request
+re-caches. The 7-day limit carries a pace delta, the used percentage minus the
+elapsed share of the window, so `+6` means usage runs six points ahead of the
+clock; it is dim within five points, yellow above, orange above fifteen. The
+tracked settings re-run the line every 60 seconds so the countdown moves while
+the session idles. Codex shows the same fields from `codex/statusline.toml`,
 with `terminal_title` set to the spinner and the thread title.
 
 `herdr/sidebar.toml` gives Herdr's agent sidebar a 34-column layout of two
