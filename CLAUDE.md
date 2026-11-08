@@ -24,8 +24,10 @@ settings. Never track logins, memory, caches or tool-written configuration.
 
 Run `./test.sh` before committing. It discovers every tracked `test-*.sh`,
 prints one result per suite and shows the output of failing suites.
-`./test.sh --list` lists suites without running them. The pre-commit hook
-runs the same checks against a private export of the staged tree.
+`./test.sh --list` lists suites without running them. A behaviour change
+ships with a test that fails without it; prove that by reverting the change
+in a scratch copy before asking for review. The pre-commit hook runs the same
+checks against a private export of the staged tree.
 
 Scripts use `#!/usr/bin/env bash` and `set -euo pipefail`; tests use
 `set -uo pipefail`; the Agent-tool guard hook alone is POSIX `sh`. Target
