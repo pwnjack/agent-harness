@@ -7,9 +7,11 @@
 # in the target is replaced in place, a missing one is appended to its table,
 # and a missing table is appended to the file. A fragment value may span lines
 # when its key line opens an array with `[`; it ends where the brackets balance
-# and replaces the whole target value. Comment lines inside a fragment value
-# are not supported. Idempotent; the target is rewritten in place, so it keeps
-# its mode and inode. Messages are prefixed with <label>.
+# and replaces the whole target value. A simple quoted key or table name
+# (`"memories"`, `["features"]`) matches its bare spelling. Comment lines
+# inside a fragment value are not supported. Idempotent; the target is
+# rewritten in place, so it keeps its mode and inode. Messages are prefixed
+# with <label>.
 set -euo pipefail
 
 [ "$#" -ge 3 ] || { echo 'usage: toml-merge.sh <label> <target> <fragment>...' >&2; exit 2; }
@@ -24,7 +26,15 @@ tmp="$(mktemp "$target.XXXXXX")" \
 trap 'rm -f "$tmp"' EXIT
 
 TOML_TARGET=$target awk '
-  function key(l) { sub(/^[ \t]+/, "", l); sub(/[ \t]*=.*/, "", l); return l }
+  # bare spelling of simple quoted segments, so "a".b and a.b are one key
+  function canon(s,   out) {
+    out = ""
+    while (match(s, /"[A-Za-z0-9_-]+"|\047[A-Za-z0-9_-]+\047/)) {
+      out = out substr(s, 1, RSTART - 1) substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH)
+    }
+    return out s
+  }
+  function key(l) { sub(/^[ \t]+/, "", l); sub(/[ \t]*=.*/, "", l); return canon(l) }
   function flush(t,   i) {            # append fragment keys the table lacked
     for (i = 1; i <= n[t]; i++) if (!done[t, i]) { print line[t, i]; done[t, i] = 1 }
   }
@@ -41,7 +51,7 @@ TOML_TARGET=$target awk '
     if (open > 0) {                    # continuation of a multi-line fragment value
       line[tab, i] = line[tab, i] "\n" $0; multi[tab, i] = 1; open += delta($0)
     } else if ($0 ~ /^[ \t]*\[/) {
-      tab = $0; sub(/^[ \t]*/, "", tab); sub(/[ \t]*(#.*)?$/, "", tab)
+      tab = canon($0); sub(/^[ \t]*/, "", tab); sub(/[ \t]*(#.*)?$/, "", tab)
       if (!(tab in seen)) { seen[tab]; order[++ntab] = tab }
     } else if ($0 !~ /^[ \t]*(#|$)/ && tab != "") {
       i = ++n[tab]; line[tab, i] = $0; name[tab, i] = key($0); open = delta($0)
@@ -55,10 +65,10 @@ TOML_TARGET=$target awk '
   /^[ \t]*\[/ {
     if (tab in n) flush(tab)
     blanks()
-    tab = $0; sub(/^[ \t]*/, "", tab); sub(/[ \t]*(#.*)?$/, "", tab)
+    tab = canon($0); sub(/^[ \t]*/, "", tab); sub(/[ \t]*(#.*)?$/, "", tab)
     present[tab]; print; next
   }
-  /^[ \t]*[A-Za-z0-9_."-]+[ \t]*=/ && (tab in n) {
+  /^[ \t]*[A-Za-z0-9_."\047-]+[ \t]*=/ && (tab in n) {
     blanks(); k = key($0)
     for (i = 1; i <= n[tab]; i++) if (name[tab, i] == k) {
       done[tab, i] = 1

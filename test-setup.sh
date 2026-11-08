@@ -338,6 +338,19 @@ elif [ ! -e "$CLAUDE_CONFIG_DIR" ] && [ ! -e "$HOME/.claude" ] \
   ok 'brain: orphaned git directory refused before setup changes'
 else no 'brain: orphaned git directory refused before setup changes'; fi
 
+brain_home whitelist-link
+setup --brain
+projects="$CLAUDE_CONFIG_DIR/projects"
+printf 'elsewhere\n' > "$tmp/whitelist-target"
+rm -f -- "$projects/.gitignore"
+ln -s -- "$tmp/whitelist-target" "$projects/.gitignore"
+if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
+  no 'brain: symlinked whitelist refused on a repeat run'
+elif [ "$(cat -- "$tmp/whitelist-target")" = elsewhere ] && [ -L "$projects/.gitignore" ] \
+   && grep -qF -- 'refusing non-regular whitelist' "$tmp/output"; then
+  ok 'brain: symlinked whitelist refused on a repeat run, its target untouched'
+else no 'brain: symlinked whitelist refused on a repeat run, its target untouched'; cat -- "$tmp/output"; fi
+
 # Recreate interruptions after each repository initialisation step.
 for stage in init remote enabled config whitelist staged; do
   brain_home "interrupted-$stage"
@@ -534,6 +547,9 @@ jq '.keepMe = 1 | .hooks.SessionStart += [{"hooks": [
   {"type": "command", "command": "external-hook"}]}]' \
   "$CLAUDE_CONFIG_DIR/settings.json" > "$tmp/removal-settings"
 cp -- "$tmp/removal-settings" "$CLAUDE_CONFIG_DIR/settings.json"
+jq '.hooks.Stop += [{"hooks": [{"type": "command", "command": "codex-external"}]}]' \
+  "$CODEX_HOME/hooks.json" > "$tmp/removal-hooks"
+cp -- "$tmp/removal-hooks" "$CODEX_HOME/hooks.json"
 awk '
   /^## Removing the harness$/ { section = 1 }
   section && /^```bash$/ { block = 1; next }
@@ -559,6 +575,10 @@ if jq -e 'has("permissions") == false and has("autoDreamEnabled") == false
   "$CLAUDE_CONFIG_DIR/settings.json" >/dev/null; then
   ok 'removal: empty permissions object removed and unrelated settings kept'
 else no 'removal: empty permissions object removed and unrelated settings kept'; fi
+if jq -e '[.hooks[][].hooks[].command] == ["codex-external"]' "$CODEX_HOME/hooks.json" >/dev/null; then
+  ok 'removal: codex sidebar hooks removed from every event, foreign codex hook kept'
+else no 'removal: codex sidebar hooks removed from every event, foreign codex hook kept'
+  cat -- "$CODEX_HOME/hooks.json"; fi
 cp -- "$CLAUDE_CONFIG_DIR/settings.json" "$tmp/removed-settings"
 if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
    && cmp -s -- "$tmp/removed-settings" "$CLAUDE_CONFIG_DIR/settings.json" \
@@ -587,14 +607,18 @@ if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
   ok 'removal: user permission rules survive'
 else no 'removal: user permission rules survive'; cat -- "$tmp/removal-output"; fi
 
-# Run the same documented block with no Claude config or brain repository.
+# Run the same documented block on the Codex-only install above, with no
+# Claude config or brain repository and a malformed hooks.json left alone.
 export HOME="$tmp/codex-only" CLAUDE_CONFIG_DIR="$tmp/codex-only/config"
 export CODEX_HOME="$tmp/codex-only/codex" XDG_STATE_HOME="$tmp/codex-only/state"
 export XDG_CONFIG_HOME="$tmp/codex-only/xdg-config"
 : > "$TEST_SYSTEMCTL_LOG"
+printf '{bad\n' > "$CODEX_HOME/hooks.json"
 if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
    && [ ! -L "$HOME/.claude/harness" ] && [ ! -L "$CODEX_HOME/AGENTS.md" ] \
    && [ ! -e "$CLAUDE_CONFIG_DIR" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && [ "$(cat -- "$CODEX_HOME/hooks.json")" = '{bad' ] \
+   && [ -z "$(ls -- "$CODEX_HOME" | grep '^hooks\.json\.')" ] \
    && bash "$tmp/removal.sh" >> "$tmp/removal-output" 2>&1; then
   ok 'removal: Codex-only install without Claude settings or a brain is repeatable'
 else no 'removal: Codex-only install without Claude settings or a brain is repeatable';

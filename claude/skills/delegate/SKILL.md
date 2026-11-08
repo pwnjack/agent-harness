@@ -49,8 +49,8 @@ the implementer's report or test claims:
 - uncommitted work: `git diff HEAD`, plus `git status --short` for new files
 - a commit: `git show <sha>`; a branch: `git diff main...<branch>`
 
-Tell it: "Read `~/.claude/skills/delegate/review.md` and follow it. Report
-findings only; do not edit any file." Check every finding against the code
+Tell it: "Read `~/.claude/harness/claude/skills/delegate/review.md` and
+follow it. Report findings only; do not edit any file." Check every finding against the code
 yourself, drop what does not hold, and give the user one report that merges the
 verified findings with your own assessment, keeping the rubric's numbers and
 groups. Apply only the findings the user picks, then re-run the verification.
@@ -86,8 +86,8 @@ Write the brief to `/tmp/delegate/<role>-<task>.brief.md`, then with
 `run_in_background: true`:
 
 ```bash
-~/.claude/skills/delegate/pane.sh claude <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
-~/.claude/skills/delegate/pane.sh codex <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
+~/.claude/harness/claude/skills/delegate/pane.sh claude <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
+~/.claude/harness/claude/skills/delegate/pane.sh codex <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
 ```
 
 The pane is named `<role>-<model>-<task>` (`impl-sonnet-privacy`,
@@ -95,8 +95,9 @@ The pane is named `<role>-<model>-<task>` (`impl-sonnet-privacy`,
 `review`, `explore` or `fix`. Task is one or two `a-z0-9-` words naming the
 work, the same for an implementer and its reviewer; it never repeats the role,
 the family or the alias (the script refuses that), and the name fits 32
-characters. The script opens a pane beside you, hands over the brief, asks for a JSON report,
-and exits with one verdict line (meanings in the script header):
+characters. The script opens a pane beside you, hands over the brief, asks
+for a JSON report, and exits with one verdict line (meanings in the script
+header):
 
 - `REPORT`: the report is printed; `jq . <report>` for the rest.
 - `BLOCKED`: the worker waits on interactive input (an approval or question
@@ -150,11 +151,12 @@ three rows; effort is chosen per task as above.
   default), so the pane survives for fix rounds.
 - **Fix rounds.** 1-3: write the findings to a file, then
   `pane.sh --resume <pane> <file>` (a fresh report path, pane kept). 4-5: a
-  fresh pane with a stronger model or a higher effort. Close the pane when the task review passes.
+  fresh pane with a stronger model or a higher effort. Close the pane when
+  the task review passes.
 - **Reviewers.** Task review and re-review: the other family from that task's
   implementer. Final review: the other family to the implementers, on the
   whole branch; this is the review above, reported once, and its notes file
-  ends with the rubric line from Review. Keep a plan's
-  implementers to one family; if both implemented, each family reviews it.
+  ends with the rubric line from Review. Keep a plan's implementers to one
+  family; if both implemented, each family reviews it.
 - `requesting-code-review` is the review above; `dispatching-parallel-agents`
   is one pane per agent. Never nest an orchestrator: workers are leaves.

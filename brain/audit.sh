@@ -91,10 +91,12 @@ audit_project() {
 
   # Inspect symlinked files too, without descending into symlinked directories.
   find "$memory" -mindepth 1 -name '.*' -prune -o \
-    \( -type f -o -type l \) -name '*.md' ! -name MEMORY.md -print0 \
+    \( -type f -o -type l \) -name '*.md' -print0 \
     | sort_paths > "$tmp/files"
   while IFS= read -r -d '' file; do
     path=${file#"$memory/"}
+    # Only the root index was handled above; a nested MEMORY.md is a memory.
+    [ "$path" != MEMORY.md ] || continue
     found=false
     for ((i=0; i<count; i++)); do
       if [ "${listed[$i]}" = "$path" ]; then found=true; break; fi

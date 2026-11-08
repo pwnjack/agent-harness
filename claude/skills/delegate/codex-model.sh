@@ -10,6 +10,8 @@
 #     effort: low | medium | high | xhigh
 #   codex-model.sh --is-expensive <alias-or-slug>
 #
+# The catalogue is CODEX_MODELS_CACHE, else models_cache.json under CODEX_HOME
+# (~/.codex by default).
 # stdout, one line each: the model slug (empty for inherit), then the effort
 # actually used. The reason for any adjustment or failure goes to stderr.
 # Exit: 0 resolved, 2 usage, 3 not resolvable — the caller degrades to inherit.
@@ -73,7 +75,7 @@ if [ "$alias" = inherit ]; then
 fi
 
 command -v jq >/dev/null || { echo "jq is not installed; cannot read the codex model catalogue" >&2; exit 3; }
-cache=${CODEX_MODELS_CACHE:-$HOME/.codex/models_cache.json}
+cache=${CODEX_MODELS_CACHE:-${CODEX_HOME:-$HOME/.codex}/models_cache.json}
 [ -r "$cache" ] || { echo "codex model catalogue missing: $cache" >&2; exit 3; }
 
 err=$(mktemp); trap 'rm -f "$err"' EXIT

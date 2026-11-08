@@ -6,7 +6,6 @@
   Claude. With no usable Codex, a different Claude tier in a fresh context
   reviews, reported as same-family.
 - **Blind review.** The reviewer never sees the implementer's report.
-- **One review mandate.** Only `CLAUDE.global.md` requires a review.
 - **One rubric.** `claude/skills/delegate/review.md` is the reviewer's
   checklist, read from the brief by Claude and Codex alike, so it costs
   context only in the reviewer's pane. Findings are ordered bug, risk, load,
@@ -31,8 +30,9 @@
   and keeps every reviewer cross-family and blind, SDD's per-task reviewer
   included. `DELEGATE_KEEP=1` on launch keeps an implementer's pane for fix
   rounds; `--resume` sends each round with a fresh report path. Briefs come
-  only from `sdd-brief.sh`, which fills the plugin's own templates, splices
-  values in Python as literal text, and fails closed when a template changes.
+  only from `sdd-brief.sh`, which fills the plugin's own templates (the newest
+  installed under `CLAUDE_CONFIG_DIR`, or `SDD_SKILLS`), splices values in
+  Python as literal text, and fails closed when a template changes.
   The Herdr-only `claude/hooks/agent-guard.sh` refuses the Agent tool, so the
   plugin's wording cannot route around the panes; outside Herdr it is silent.
 - **Recursion guards.** A Claude pane gets a leaf directive through

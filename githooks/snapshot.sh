@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Export a private index snapshot using read-only Git commands. Its minimal Git
 # metadata supports tracked-file discovery without sharing writable state with
 # the real repository. No stash, checkout, staging, or temporary branch.

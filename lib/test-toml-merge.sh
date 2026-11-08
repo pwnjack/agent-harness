@@ -86,4 +86,13 @@ if ! bash "$here/toml-merge.sh" test "$tmp/absent/target.toml" "$tmp/fragment.to
   ok "write error: non-zero with a message"
 else no "write error: non-zero with a message"; fi
 
+printf '[features]\nmemories = false\n' > "$tmp/fragment.toml"
+for quote in '"' "'"; do
+  printf '[%sfeatures%s]\n%smemories%s = true\nother = 1\n' "$quote" "$quote" "$quote" "$quote" > "$tmp/target.toml"
+  printf '[%sfeatures%s]\nmemories = false\nother = 1\n' "$quote" "$quote" > "$tmp/expected.toml"
+  if merge && cmp -s -- "$tmp/expected.toml" "$tmp/target.toml"; then
+    ok "key and table name quoted with $quote replaced by their bare spelling"
+  else no "key and table name quoted with $quote replaced by their bare spelling"; cat -- "$tmp/target.toml"; fi
+done
+
 exit "$fail"

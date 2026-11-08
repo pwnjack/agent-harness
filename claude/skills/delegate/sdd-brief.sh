@@ -23,7 +23,7 @@
 # and caller content is never mistaken for a template defect.
 set -euo pipefail
 
-skills=${SDD_SKILLS:-$(ls -d "$HOME"/.claude/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)}
+skills=${SDD_SKILLS:-$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)}
 sdd=$skills/subagent-driven-development
 [ -d "$sdd" ] || { echo "Superpowers not found (SDD_SKILLS=$skills)" >&2; exit 2; }
 usage() { grep '^#   sdd-brief.sh' "$0" | sed 's/^# *//' >&2; exit 2; }

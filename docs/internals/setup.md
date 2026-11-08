@@ -19,6 +19,8 @@
 | `herdr/sidebar-report.sh` | called by the status line and the Codex hook | run in place |
 | `lib/toml-merge.sh` | called by the apply scripts | run in place |
 | `brain/gitignore` | `<config>/projects/.gitignore` | exact copy, committed in the brain |
+| `brain/commit.sh` | named in the rendered service | run in place by the timer |
+| `brain/audit.sh`, `brain/patterns` | read by `commit.sh` beside itself | run in place |
 | `brain/brain-commit.service.in`, `brain/brain-commit.timer` | `~/.config/systemd/user/` | rendered with `--brain` |
 
 `./setup.sh [--dry-run] [--brain]` does the wiring. It skips any absent tool,
@@ -55,9 +57,11 @@ Symlinked `.git` entries and foreign repositories are also refused.
 
 The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
-vdirsyncer data), the Agent-tool guard hook, the `pkill -f` guard hook, the advisor-reset hook, the
-status line and the plugin list. `codex/statusline.toml` is the tracked slice
-of Codex's `config.toml`; `codex/features.toml` sets `memories = false`.
+vdirsyncer data), the Agent-tool guard hook, the `pkill -f` guard hook, the
+advisor-reset hook, the status line, the plugin list, empty commit and pull
+request attribution, the fullscreen TUI and push notifications from agents.
+`codex/statusline.toml` is the tracked slice of Codex's `config.toml`;
+`codex/features.toml` sets `memories = false`.
 
 Never track logins, history, memory, caches, plugin checkouts, or anything a
 tool writes into its own config (Herdr's hooks, project trust, auto-mode
@@ -184,6 +188,19 @@ if [ -n "$harness" ] && [ -f "$settings" ]; then
   mv -- "$settings_tmp" "$settings"
 fi
 
+if [ -n "$harness" ] && [ -f "$codex_dir/hooks.json" ] \
+   && jq -e '.hooks | type == "object"' "$codex_dir/hooks.json" >/dev/null 2>&1; then
+  hooks_tmp=$(mktemp "$codex_dir/hooks.json.XXXXXX")
+  trap 'rm -f -- "$hooks_tmp"' EXIT
+  jq --arg command "bash '$HOME/.claude/harness/codex/hooks/sidebar.sh'" '
+    .hooks |= (with_entries(.value |= [ .[]
+        | .hooks |= ((. // []) | map(select(.command != $command)))
+        | select(.hooks | length > 0) ])
+      | with_entries(select(.value | length > 0)))
+  ' "$codex_dir/hooks.json" > "$hooks_tmp"
+  mv -- "$hooks_tmp" "$codex_dir/hooks.json"
+fi
+
 if [ -n "$harness" ]; then
   for skill in "$harness"/claude/skills/*/; do
     skill=${skill%/}
@@ -211,9 +228,11 @@ fi
 The jq filter removes the tracked status line only if it still matches, the
 guard and advisor-reset commands from their hook groups, the tracked deny
 rules and `autoDreamEnabled`. Other hooks, including Herdr's, and unrelated
-settings survive; empty permissions and hooks objects are removed. The block
-is safe to run again after removal. Only skill and instruction symlinks pointing
-at this clone are removed. The brain worktree, its `.git` file and its git
+settings survive; empty permissions and hooks objects are removed. The Codex
+sidebar hook is removed from every event in `hooks.json`; other Codex hooks
+survive, and a `hooks.json` that is not a JSON object with a `hooks` object
+is left alone. The block is safe to run again after removal. Only skill and
+instruction symlinks pointing at this clone are removed. The brain worktree, its `.git` file and its git
 directory remain, with automatic commits disabled. Merged preferences, plugin
 registrations, installed plugins and Codex's TOML settings stay; review them against
 `claude/settings.json` and `codex/*.toml` to revert those too. The clone's

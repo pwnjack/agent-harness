@@ -2,11 +2,18 @@
 # Tests for sdd-brief.sh: each kind fills every placeholder, review kinds are
 # blind (no implementer report), bad ranges are refused, and the real installed
 # Superpowers templates still fit (skipped when the plugin is absent). Uses a
-# throwaway git repo; never touches the real ~/.config.
+# throwaway git repo under a temporary HOME; never touches machine state.
 #   bash claude/skills/delegate/test-sdd-brief.sh
 set -uo pipefail
 here=$(dirname "$(readlink -f "$0")")
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+# The installed templates are resolved before HOME moves; they are only read.
+real=${SDD_TEST_SKILLS:-$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)}
+export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
+export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
+mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 fail=0
 ok() { echo "ok   $1"; }
 no() { echo "FAIL $1"; fail=1; }
@@ -135,6 +142,12 @@ git diff "$2..$3" > "$out"; echo "wrote $out: 1 lines"
 S
 SDD_SKILLS=$fake suite fake
 
+# Without SDD_SKILLS the newest installed templates are found under CLAUDE_CONFIG_DIR.
+mkdir -p "$CLAUDE_CONFIG_DIR/plugins/cache/m/superpowers/1.0.0"
+cp -r "$fake" "$CLAUDE_CONFIG_DIR/plugins/cache/m/superpowers/1.0.0/skills"
+if run implementer docs/plan.md 1 "$repo" "$tmp/context" >/dev/null
+then ok "default templates found under CLAUDE_CONFIG_DIR"; else no "default templates: $(cat "$tmp/err")"; fi
+
 # Hostile input is data, never code: a title that would run a GNU sed `e`
 # command, an ampersand, and a file name holding a literal backslash-n.
 printf '### Task 1: a & b|; e touch %s/pwned #\n\nDo it.\n' "$tmp" > docs/evil.md
@@ -164,7 +177,6 @@ mutate leak2 's/^    Compare\.$/    Compare. See task-N-report.md for author not
 expect4 leak2 review docs/plan.md 1 "$base" "$head" "$tmp/constraints"
 
 # The installed plugin's own templates: catches an upstream rename.
-real=${SDD_TEST_SKILLS:-$(ls -d "$HOME"/.claude/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)}
 if [ -n "$real" ]; then SDD_SKILLS=$real suite installed
 else echo "skip installed suite: Superpowers not installed"; fi
 

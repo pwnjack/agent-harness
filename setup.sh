@@ -73,6 +73,10 @@ if $brain; then
   elif [ -e "$brain_git" ] || [ -L "$brain_git" ]; then
     refuse "refusing existing brain git directory without $projects/.git: $brain_git"
   fi
+  # The whitelist is copied over in place: never through a symlink.
+  if [ -L "$projects/.gitignore" ] || { [ -e "$projects/.gitignore" ] && [ ! -f "$projects/.gitignore" ]; }; then
+    refuse "refusing non-regular whitelist at $projects/.gitignore"
+  fi
 fi
 
 link() {
@@ -91,7 +95,7 @@ link() {
   $dry || echo "  linked $dst"
 }
 
-have jq || { echo "agents: jq is required; skipping harness setup" >&2; exit 1; }
+have jq || refuse 'jq is required'
 if [ -e "$repo/.git" ]; then
   run git -C "$repo" config --local core.hooksPath githooks
 fi
