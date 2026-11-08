@@ -68,7 +68,7 @@ TOML_TARGET=$target awk '
     tab = canon($0); sub(/^[ \t]*/, "", tab); sub(/[ \t]*(#.*)?$/, "", tab)
     present[tab]; print; next
   }
-  /^[ \t]*[A-Za-z0-9_."-]+[ \t]*=/ && (tab in n) {
+  /^[ \t]*[A-Za-z0-9_."\047-]+[ \t]*=/ && (tab in n) {
     blanks(); k = key($0)
     for (i = 1; i <= n[tab]; i++) if (name[tab, i] == k) {
       done[tab, i] = 1

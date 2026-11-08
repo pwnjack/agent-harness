@@ -16,7 +16,8 @@ commands, including Herdr, so they never install hooks or units on the host.
   repeat runs, a symlinked whitelist refused on a repeat `--brain` run, and
   the removal block in `docs/internals/setup.md` run verbatim twice, including
   Codex-only installs, removal of empty hooks and permissions, removal of the
-  Codex sidebar hooks, and preservation of user rules and hooks.
+  Codex sidebar hooks with a malformed `hooks.json` left alone, and
+  preservation of user rules and hooks.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
   history in tracked Markdown, and portable flags outside the exemption list,
   with fixtures for combined sed flags, backticks and shell comments.
@@ -36,9 +37,9 @@ commands, including Herdr, so they never install hooks or units on the host.
   projects and patterns without a final newline.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces, and the review rubric named in the delegate skill
-  and kept report-only; the global instructions name all four skills;
-  wrap-up names handover and the learning skill, and handover names its six
-  parts; the learning skill and its audit path exist, its example honours
+  and kept report-only; the global instructions name all four skills; the
+  three memory-writing skills carry the orchestrator-only gate; wrap-up names
+  handover and the learning skill, and handover names its six parts; the learning skill and its audit path exist, its example honours
   the brain-present gate and config paths, derives the key
   from the repository root in subdirectories, and propagates audit failures.
 - `claude/skills/delegate/test-delegate.sh`: model resolution (the catalogue
@@ -63,9 +64,11 @@ commands, including Herdr, so they never install hooks or units on the host.
   during a blocked placement read leaves nothing holding it).
 - `claude/skills/delegate/test-sdd-brief.sh`: every brief kind is filled and
   blind, bad ranges and changed templates are refused, hostile titles and
-  file names stay literal; against stand-in templates and the installed
-  plugin's templates when present. `./test.sh` resolves the installed skills
-  directory before sandboxing HOME and config, passing it as `SDD_TEST_SKILLS`.
+  file names stay literal, and the default template search follows
+  `CLAUDE_CONFIG_DIR`; against stand-in templates and the installed plugin's
+  templates when present. The suite isolates HOME, the config and state
+  directories and Git configuration itself; `./test.sh` resolves the installed
+  skills directory before sandboxing, passing it as `SDD_TEST_SKILLS`.
   That directory is only read; generated briefs stay in the temporary repo.
   Set `SDD_TEST_SKILLS` to select a directory explicitly; an absent plugin
   skips only the installed-template check.

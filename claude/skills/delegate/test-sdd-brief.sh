@@ -142,6 +142,12 @@ git diff "$2..$3" > "$out"; echo "wrote $out: 1 lines"
 S
 SDD_SKILLS=$fake suite fake
 
+# Without SDD_SKILLS the newest installed templates are found under CLAUDE_CONFIG_DIR.
+mkdir -p "$CLAUDE_CONFIG_DIR/plugins/cache/m/superpowers/1.0.0"
+cp -r "$fake" "$CLAUDE_CONFIG_DIR/plugins/cache/m/superpowers/1.0.0/skills"
+if run implementer docs/plan.md 1 "$repo" "$tmp/context" >/dev/null
+then ok "default templates found under CLAUDE_CONFIG_DIR"; else no "default templates: $(cat "$tmp/err")"; fi
+
 # Hostile input is data, never code: a title that would run a GNU sed `e`
 # command, an ampersand, and a file name holding a literal backslash-n.
 printf '### Task 1: a & b|; e touch %s/pwned #\n\nDo it.\n' "$tmp" > docs/evil.md

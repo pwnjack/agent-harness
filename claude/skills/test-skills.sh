@@ -141,6 +141,12 @@ for skill in delegate compound-learning wrap-up handover; do
     bash -c 'grep -q "\`$2\` skill" "$1" && test -f "$3/$2/SKILL.md"' _ "$claude/CLAUDE.global.md" "$skill" "$here"
 done
 
+# --- only the orchestrator in the main checkout runs the memory-writing skills
+for skill in compound-learning wrap-up handover; do
+  check "$skill: runs only as the orchestrator in the main checkout" \
+    bash -c 'tr "\n" " " < "$1" | grep -q "orchestrator in the main checkout"' _ "$here/$skill/SKILL.md"
+done
+
 # --- session end: wrap-up records through handover, handover has its parts ---
 check "wrap-up: names the handover and compound-learning skills" \
   bash -c 'grep -q "\`handover\` skill" "$1" && grep -q "\`compound-learning\` skill" "$1"' \

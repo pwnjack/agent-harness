@@ -30,8 +30,9 @@
   and keeps every reviewer cross-family and blind, SDD's per-task reviewer
   included. `DELEGATE_KEEP=1` on launch keeps an implementer's pane for fix
   rounds; `--resume` sends each round with a fresh report path. Briefs come
-  only from `sdd-brief.sh`, which fills the plugin's own templates, splices
-  values in Python as literal text, and fails closed when a template changes.
+  only from `sdd-brief.sh`, which fills the plugin's own templates (the newest
+  installed under `CLAUDE_CONFIG_DIR`, or `SDD_SKILLS`), splices values in
+  Python as literal text, and fails closed when a template changes.
   The Herdr-only `claude/hooks/agent-guard.sh` refuses the Agent tool, so the
   plugin's wording cannot route around the panes; outside Herdr it is silent.
 - **Recursion guards.** A Claude pane gets a leaf directive through

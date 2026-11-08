@@ -607,14 +607,18 @@ if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
   ok 'removal: user permission rules survive'
 else no 'removal: user permission rules survive'; cat -- "$tmp/removal-output"; fi
 
-# Run the same documented block with no Claude config or brain repository.
+# Run the same documented block on the Codex-only install above, with no
+# Claude config or brain repository and a malformed hooks.json left alone.
 export HOME="$tmp/codex-only" CLAUDE_CONFIG_DIR="$tmp/codex-only/config"
 export CODEX_HOME="$tmp/codex-only/codex" XDG_STATE_HOME="$tmp/codex-only/state"
 export XDG_CONFIG_HOME="$tmp/codex-only/xdg-config"
 : > "$TEST_SYSTEMCTL_LOG"
+printf '{bad\n' > "$CODEX_HOME/hooks.json"
 if bash "$tmp/removal.sh" > "$tmp/removal-output" 2>&1 \
    && [ ! -L "$HOME/.claude/harness" ] && [ ! -L "$CODEX_HOME/AGENTS.md" ] \
    && [ ! -e "$CLAUDE_CONFIG_DIR" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
+   && [ "$(cat -- "$CODEX_HOME/hooks.json")" = '{bad' ] \
+   && [ -z "$(ls -- "$CODEX_HOME" | grep '^hooks\.json\.')" ] \
    && bash "$tmp/removal.sh" >> "$tmp/removal-output" 2>&1; then
   ok 'removal: Codex-only install without Claude settings or a brain is repeatable'
 else no 'removal: Codex-only install without Claude settings or a brain is repeatable';
