@@ -15,7 +15,8 @@ to report `PRIVATE`. It runs `git init -b main --separate-git-dir`, sets
 `brain/gitignore` as `brain: start`. It reuses its own gitfile, refuses any
 other `.git`, and refreshes `<config>/projects/.gitignore` when the tracked
 whitelist has changed. A re-run changes nothing else. Plain setup creates no
-brain and never enables auto-dream (it does not disable an existing setting). Never run `--brain` on a work machine.
+brain and never enables auto-dream (it does not disable an existing setting).
+Never run `--brain` on a work machine.
 
 The whitelist admits only `.gitignore` and non-hidden Markdown beneath
 `*/memory/`, excluding hidden and `-tmp*` projects. The installed `.gitignore`
@@ -66,7 +67,8 @@ journalctl --user -u brain-commit
 
 `brain/audit.sh <projects-dir> [project-key...]` is read-only. It reports
 memories absent from `MEMORY.md`, index links to missing files and secret
-patterns by name, including symlinked Markdown files. Only relative file
+patterns by name, including symlinked Markdown files and nested `MEMORY.md`
+files. Only relative file
 links count as memory entries; repeated links are checked once. Symlinks to
 regular files are scanned even outside memory: the audit checks what the
 agent reads, while `commit.sh` stores only the link text. Dangling links and

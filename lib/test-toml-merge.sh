@@ -61,6 +61,23 @@ if merge && cmp -s -- "$tmp/expected.toml" "$tmp/target.toml" \
   ok "inline tables on fragment lines kept verbatim"
 else no "inline tables on fragment lines kept verbatim"; fi
 
+printf '[features]\nmemories = false\n' > "$tmp/fragment.toml"
+printf '["features"]\n"memories" = true\nother = 1\n' > "$tmp/target.toml"
+printf '["features"]\nmemories = false\nother = 1\n' > "$tmp/expected.toml"
+if merge && cmp -s -- "$tmp/expected.toml" "$tmp/target.toml" \
+   && python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$tmp/target.toml" 2>/dev/null; then
+  ok "quoted key and table name replaced by their bare spelling, no duplicate key"
+else no "quoted key and table name replaced by their bare spelling, no duplicate key"; fi
+
+cat > "$tmp/fragment.toml" <<'EOF'
+[ui]
+rows = [
+  ["a", { token = "$x", rules = [{ equals = "y", fg = "#fff" }] }],
+]
+EOF
+printf '[ui]\nrows = []\nwidth = 30\n' > "$tmp/target.toml"
+{ printf '[ui]\n'; tail -n +2 -- "$tmp/fragment.toml"; printf 'width = 30\n'; } > "$tmp/expected.toml"
+merge
 : > "$tmp/empty.toml"
 printf '[ui]\nrows = ["old"]\nwidth = 30\n' > "$tmp/target.toml"
 if bash "$here/toml-merge.sh" test "$tmp/target.toml" "$tmp/empty.toml" "$tmp/fragment.toml" > "$tmp/output" 2>&1 \

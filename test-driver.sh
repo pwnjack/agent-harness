@@ -57,6 +57,23 @@ for arg in '' --list; do
   cat -- "$tmp/output"
 done
 
+# The real exporter copies staged blobs, not the worktree, and leaves the
+# source repository's index and worktree alone.
+mkdir -p -- "$tmp/staged"
+git -C "$tmp/staged" init -q -b main || exit 1
+printf 'staged\n' > "$tmp/staged/f"
+git -C "$tmp/staged" add f || exit 1
+printf 'unstaged\n' > "$tmp/staged/f"
+cp -- "$tmp/staged/.git/index" "$tmp/index-before"
+if bash -- "$repo/githooks/snapshot.sh" "$tmp/staged" "$tmp/export" > "$tmp/output" 2>&1 \
+   && [ "$(cat -- "$tmp/export/worktree/f")" = staged ] \
+   && [ "$(git -C "$tmp/export/worktree" ls-files)" = f ] \
+   && [ "$(git -C "$tmp/export/worktree" show :f)" = staged ] \
+   && [ "$(cat -- "$tmp/staged/f")" = unstaged ] \
+   && cmp -s -- "$tmp/index-before" "$tmp/staged/.git/index"; then
+  ok 'snapshot exports staged content, lists it as tracked, leaves the source alone'
+else no 'snapshot exports staged content, lists it as tracked, leaves the source alone'; cat -- "$tmp/output"; fi
+
 # Exercise the real hook, with a tiny snapshot stand-in and a failing git read.
 mkdir -p -- "$tmp/clone/githooks"
 cp -- "$repo/githooks/pre-commit" "$tmp/clone/githooks/pre-commit"

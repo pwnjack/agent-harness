@@ -6,7 +6,6 @@
   Claude. With no usable Codex, a different Claude tier in a fresh context
   reviews, reported as same-family.
 - **Blind review.** The reviewer never sees the implementer's report.
-- **One review mandate.** Only `CLAUDE.global.md` requires a review.
 - **One rubric.** `claude/skills/delegate/review.md` is the reviewer's
   checklist, read from the brief by Claude and Codex alike, so it costs
   context only in the reviewer's pane. Findings are ordered bug, risk, load,

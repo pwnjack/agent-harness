@@ -54,6 +54,15 @@ if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then
 else no 'clean project: exit 0, no output'; fi
 
 fixture
+mkdir -p -- "$memory/nested"
+printf 'token sk-%s\n' 'abcdefghijklmnopqrstuvwxyz' > "$memory/nested/MEMORY.md"
+audit
+if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/nested/MEMORY.md: not in MEMORY.md
+ERROR -home-u-proj/memory/nested/MEMORY.md: secret (openai)'; then
+  ok 'nested MEMORY.md: indexed and scanned like any memory'
+else no 'nested MEMORY.md: indexed and scanned like any memory'; cat -- "$tmp/output"; fi
+
+fixture
 printf 'A missed memory.\n' > "$memory/gtk4-blur-on-hyprland.md"
 audit
 if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/gtk4-blur-on-hyprland.md: not in MEMORY.md'; then

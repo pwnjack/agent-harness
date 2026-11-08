@@ -73,6 +73,10 @@ expect nolisted sol   low    3 ""
 expect arr   sol      low    3 ""
 expect broken sol     low    3 ""
 expect missing sol    low    3 ""
+mkdir -p "$tmp/codex-home" && cp "$tmp/real.json" "$tmp/codex-home/models_cache.json"
+out=$(CODEX_HOME=$tmp/codex-home HOME=$tmp/no-such-home "$here/codex-model.sh" sol medium 2>/dev/null | paste -sd' ')
+if [ "$out" = "gen9-sol medium" ]; then echo "ok   catalogue read from CODEX_HOME"
+else echo "FAIL catalogue read from CODEX_HOME: out '$out'"; fail=1; fi
 
 # expensive <alias-or-slug> <want-exit> — needs no catalogue, so none is given
 expensive() {

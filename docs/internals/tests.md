@@ -13,9 +13,10 @@ commands, including Herdr, so they never install hooks or units on the host.
   symlinked repositories and orphaned git directories, rendered units (including
   a clone path with spaces), permission unions, Codex-only installs, absent tools
   and source archives, dry-run previews inside an unrelated parent repository,
-  repeat runs, and the removal block in `docs/internals/setup.md` run verbatim
-  twice, including Codex-only installs, removal of empty hooks and permissions,
-  and preservation of user rules.
+  repeat runs, a symlinked whitelist refused on a repeat `--brain` run, and
+  the removal block in `docs/internals/setup.md` run verbatim twice, including
+  Codex-only installs, removal of empty hooks and permissions, removal of the
+  Codex sidebar hooks, and preservation of user rules and hooks.
 - `test-budgets.sh`: byte budgets for the global instructions, no dated
   history in tracked Markdown, and portable flags outside the exemption list,
   with fixtures for combined sed flags, backticks and shell comments.
@@ -24,7 +25,8 @@ commands, including Herdr, so they never install hooks or units on the host.
 - `brain/test-audit.sh`: relative and duplicate memory index links, ordering
   with older jq and newline-containing paths, secret diagnostics, symlinked
   files, unknown keys, unreadable files, patterns without a final newline,
-  nested paths, excluded files and the 4096-byte warning.
+  nested paths, nested `MEMORY.md` files, excluded files and the 4096-byte
+  warning.
 - `brain/test-commit.sh`: whitelist refresh (missing, altered, loosened and
   upstream-changed copies), refused refreshes (read-only directory, failed
   copy, symlinked or directory `.gitignore`), path and secret refusals,
@@ -34,13 +36,13 @@ commands, including Herdr, so they never install hooks or units on the host.
   projects and patterns without a final newline.
 - `claude/skills/test-skills.sh`: frontmatter, referenced files, no pinned
   IDs, plugin marketplaces, and the review rubric named in the delegate skill
-  and kept report-only; the global instructions name the delegate, wrap-up
-  and handover skills; wrap-up names handover and the learning skill, and
-  handover names its six parts; the learning skill and its audit path exist, its
-  example honours the brain-present gate and config paths, derives the key
+  and kept report-only; the global instructions name all four skills;
+  wrap-up names handover and the learning skill, and handover names its six
+  parts; the learning skill and its audit path exist, its example honours
+  the brain-present gate and config paths, derives the key
   from the repository root in subdirectories, and propagates audit failures.
-- `claude/skills/delegate/test-delegate.sh`: model resolution, the opt-in
-  gate, and every `pane.sh` verdict against a stub Herdr (a case over
+- `claude/skills/delegate/test-delegate.sh`: model resolution (the catalogue
+  under `CODEX_HOME` included), the opt-in gate, and every `pane.sh` verdict against a stub Herdr (a case over
   `CASE_BUDGET` seconds, default 5, fails), including hook-review
   recovery, limit text that is not a quota hit, malformed reports, a worker
   that finishes between polls (by `completion_seq`, focused or resumed, and by
@@ -83,14 +85,17 @@ commands, including Herdr, so they never install hooks or units on the host.
   watchdog on a hung call.
 - `test-driver.sh`: `test.sh` clears inherited Herdr environment variables,
   resolves the newest installed templates by version before sandboxing, and
-  refuses an empty suite list; pre-commit refuses a failed local Git
-  environment read.
+  refuses an empty suite list; the staged-tree exporter copies staged content
+  and leaves the source repository alone; pre-commit refuses a failed local
+  Git environment read.
 - `herdr/test-apply-config.sh`: the harness layout merge, rollback on a failed
-  merge or config check, the backup kept when rollback fails, the `rows_by_agent` warning, reload and skipping without Herdr.
+  merge or config check, the backup kept when rollback fails, the
+  `rows_by_agent` warning, reload and skipping without Herdr.
 - `claude/test-statusline.sh`: the status line reports to the sidebar without
   changing what it prints.
 - `codex/test-codex-hooks.sh`: the Codex sidebar hook (model slug, effort from
   the transcript, silence) and the `hooks.json` merge beside Herdr's entry.
 - `lib/test-toml-merge.sh`: multi-line fragment values replacing one-line and
   multi-line target values, appended tables, inline tables kept verbatim,
-  repeat merges, in-place rewrites and write errors.
+  quoted keys and table names matched by their bare spelling, repeat merges,
+  in-place rewrites and write errors.

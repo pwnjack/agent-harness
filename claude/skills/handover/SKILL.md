@@ -9,7 +9,8 @@ A handover is one note from which the next session, agent or person starts
 without re-deriving anything. It is written to the project's memory
 directory, the one named in the session's memory instructions, from the main
 checkout. When the user names a reader or a place, the same note also goes
-there.
+there. Run it only as the orchestrator in the main checkout; a leaf worker or
+a worktree session puts the same six parts in its report instead.
 
 ## The note
 

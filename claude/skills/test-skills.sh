@@ -127,17 +127,16 @@ for d in "$here"/*/; do
   check "$n: has a description" bash -c 'sed -n "3p" "$1" | grep -q "^description: ."' _ "$f"
 done
 
-# --- every ~/.claude/skills/<path> the instructions name exists in the repo ---
+# --- every skill file the instructions name exists in the repo, under the
+# fixed harness link (~/.claude/harness/claude/skills/) or the skills link ---
 missing=0
 # shellcheck disable=SC2088  # a literal ~ path, matched as text
 while IFS= read -r ref; do
-  [ -e "$here/$ref" ] || { no "~/.claude/skills/$ref is referenced but missing"; missing=1; }
-done < <(grep -rhoE '~/\.claude/skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE.global.md" \
-           --include='*.md' --include='*.sh' | sed 's#^~/\.claude/skills/##' | sort -u)
+  [ -e "$here/$ref" ] || { no "skills/$ref is referenced but missing"; missing=1; }
+done < <(grep -rhoE '~/\.claude/(harness/claude/)?skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE.global.md" \
+           --include='*.md' --include='*.sh' | sed -E 's#^~/\.claude/(harness/claude/)?skills/##' | sort -u)
 [ "$missing" = 0 ] && ok "every referenced skill file exists" || fail=1
-check "global instructions name an existing skill" \
-  bash -c 'grep -q "\`delegate\` skill" "$1" && test -f "$2/delegate/SKILL.md"' _ "$claude/CLAUDE.global.md" "$here"
-for skill in wrap-up handover; do
+for skill in delegate compound-learning wrap-up handover; do
   check "global instructions name the $skill skill, and it exists" \
     bash -c 'grep -q "\`$2\` skill" "$1" && test -f "$3/$2/SKILL.md"' _ "$claude/CLAUDE.global.md" "$skill" "$here"
 done
@@ -156,8 +155,11 @@ check "handover: the six parts in order" \
 
 # --- the review rubric the delegate skill hands to every reviewer --------------
 # shellcheck disable=SC2088  # a literal ~ path, matched as text
-check "delegate: the review brief names the rubric" \
-  grep -q '~/\.claude/skills/delegate/review\.md' "$here/delegate/SKILL.md"
+check "delegate: the review brief names the rubric under the harness link" \
+  grep -q '~/\.claude/harness/claude/skills/delegate/review\.md' "$here/delegate/SKILL.md"
+check "delegate: launches name pane.sh under the harness link" \
+  bash -c 'grep -q "~/\.claude/harness/claude/skills/delegate/pane\.sh" "$1" && ! grep -q "~/\.claude/skills/" "$1"' \
+  _ "$here/delegate/SKILL.md"
 check "delegate: the rubric is report-only" grep -q 'edit no file' "$here/delegate/review.md"
 
 # --- no pinned model identifiers in instruction text ---------
