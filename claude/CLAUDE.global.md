@@ -19,9 +19,9 @@ and report once. When a skill (Superpowers included) says to dispatch a
 subagent, that names the role; this rule and the delegate skill decide who runs
 it and how.
 
-When Fable would help (a third failed fix, a design-level review finding, or
-an irreversible decision with conflicting evidence), propose it with the
-reason; the user enables it with `/advisor`.
+When Fable helps (a third failed fix, a design-level review finding, or an
+irreversible decision with conflicting evidence), propose it with the reason;
+run a `fable` worker if the user agrees.
 
 ## Verification
 

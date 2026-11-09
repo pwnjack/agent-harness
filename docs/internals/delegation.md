@@ -50,9 +50,12 @@
   a codename to the newest listed model of that name at launch and clamps the
   effort to what the model lists.
 - **Model, then effort.** The skill's table picks the model per family by
-  the hardest part of the work. Effort is chosen per task for every role,
-  from starting points the skill lists; no level is fixed to a role. Past a
-  model's reach, move up a model rather than raise effort.
+  the hardest part of the work; the smallest models (`haiku`, `luna`) get
+  read-only work only, never code edits. Effort starts at `medium` and is
+  chosen per task for every role, from starting points the skill lists; no
+  level is fixed to a role. A worker that falls short gets one effort level
+  more, then the next model up at a lower effort; past Opus at `high`, the
+  orchestrator proposes Fable instead of `xhigh`.
 - **Same choice in every runner.** The Agent-tool fallback outside Herdr
   gets the same model, effort and brief as a pane.
 - **Opt-in models are an allow-list.** Only Claude `haiku`, `sonnet`, `opus`
@@ -72,9 +75,10 @@
 whenever a non-worker Claude session starts, including a scripted
 `claude -p`. The hook writes a temporary file beside the settings and renames
 it after filtering, preserving the file mode. Failed copies, filters or
-renames leave the settings untouched and do not block startup. Enable
-`/advisor fable` only in the one session doing the work.
-The orchestrator proposes it with a reason; the user decides.
+renames leave the settings untouched and do not block startup. The
+orchestrator proposes Fable with a reason and, once the user agrees, runs it
+as a worker or leaves the user to switch with `/model`; `/advisor fable`, when
+the user asks for it, is enabled only in the one session doing the work.
 
 Claude workers launched by `pane.sh` get `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`
 and `HARNESS_LEAF=1` through the `--settings` `env` object, which also turns

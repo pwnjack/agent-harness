@@ -7,25 +7,34 @@ description: Hand implementation, review or exploration to another model (Claude
 
 ## Choosing the worker: family, model, effort
 
-Pick the model by the hardest part of the task:
+Pick the model by the hardest part of the task. Small models get only work
+whose mistakes are cheap to spot; code edits and judgement calls stay on the
+larger ones:
 
 | Work (implementing, reviewing or exploring) | Claude | Codex |
 |---|---|---|
-| Mechanical edits, read-only search, small fully specified change | `haiku` | `luna` |
-| Standard implementation, tricky logic, routine or substantial review | `sonnet` | `sol` |
-| Subtle, security-bearing, cross-cutting, this harness | `opus` | `sol` |
+| Read-only: finding files, reading logs and test output, summarising | `haiku` | `luna` |
+| Well-scoped code (a bug fix, a feature or edit against a clear spec), routine review | `sonnet` | `sol` |
+| Everyday engineering and debugging, migrations, performance, subtle, security-bearing, cross-cutting, this harness, or unsure | `opus` | `sol` |
+
+A clear spec alone does not make a task Sonnet's: a migration or a
+performance change goes to Opus.
 
 Then choose the effort for this task, whatever the role, from `low`,
-`medium`, `high` and `xhigh`:
+`medium`, `high` and `xhigh`, starting at `medium`:
 
-- `low`: a narrow, well-specified lookup or edit where a missed case is cheap.
-- `medium`: routine implementation and ordinary exploration.
-- `high`: review, verification, edge-case-heavy work in existing code.
-- `xhigh`: hard bugs and design-level work.
+- `low`: a narrow lookup or edit on a capable model, or a first pass whose
+  outcome a test checks (re-run only the failures higher).
+- `medium`: most implementation, exploration and routine review.
+- `high`: substantial or security-bearing review, verification,
+  edge-case-heavy work in existing code.
+- `xhigh`: only on the largest model allowed, once `high` fell short.
 
-These are starting points: go up when a missed case would be costly, down
-when it would be cheap. Effort cuts missed cases, not wrong calls; when the
-task needs understanding the model lacks, move up a model instead.
+When a worker falls short, first make sure it can check its own work (a
+test, build or script), then raise the effort one level, then move up a
+model at a lower effort than the last. Effort cuts missed cases; it adds no
+skill the model lacks. Past Opus at `high`, propose `fable` rather than
+`xhigh`.
 - Use Codex when the spec is self-contained. Use Claude when the work needs
   this conversation's context or judgement about the repo's conventions.
 - Do trivial work (a line, a rename, a config tweak) and ambiguous or
@@ -33,6 +42,8 @@ task needs understanding the model lacks, move up a model instead.
 - Only `haiku`, `sonnet`, `opus` and `luna`, `terra`, `sol` run freely. Any
   other name (`fable`, `astra`, anything new) runs only when the user asks
   for it by name, and `pane.sh` refuses it without `DELEGATE_EXPENSIVE=1`.
+  Propose `fable`, with the reason, for a major refactor, migration or
+  architecture plan, or when Opus at `high` fell short.
   Never `max`, and never `ultra` (it lets Codex delegate).
 
 ## Review
@@ -135,7 +146,8 @@ Nothing is committed unless the user asks.
 Its skills name the Agent tool; "dispatch a subagent" is a role, and inside
 Herdr each one runs through `pane.sh` (a hook refuses the Agent tool there).
 Its tiers map onto the model table: cheap, standard and most capable are its
-three rows; effort is chosen per task as above.
+three rows, except that a cheap-tier implementer or reviewer takes the second
+row (the first is read-only work only); effort is chosen per task as above.
 
 - **Which executor.** Use subagent-driven development for plans with several
   substantial tasks. A small plan runs inline (`executing-plans`) with the one
@@ -151,7 +163,7 @@ three rows; effort is chosen per task as above.
   default), so the pane survives for fix rounds.
 - **Fix rounds.** 1-3: write the findings to a file, then
   `pane.sh --resume <pane> <file>` (a fresh report path, pane kept). 4-5: a
-  fresh pane with a stronger model or a higher effort. Close the pane when
+  fresh pane, escalated as "When a worker falls short" says. Close the pane when
   the task review passes.
 - **Reviewers.** Task review and re-review: the other family from that task's
   implementer. Final review: the other family to the implementers, on the
