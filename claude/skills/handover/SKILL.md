@@ -29,7 +29,8 @@ never overwritten unread.
    matters, and what they declined, so it is not proposed again.
 4. **Next.** What comes next in the user's order. The first item is ready to
    start: which skill opens it, which files or memories to read first.
-5. **Leftovers.** Known defects, deferred items and untested paths.
+5. **Leftovers.** Known defects, deferred items and untested paths, each
+   with the file, function or screen it lives in.
 6. **Pending from the user.** Checks only they can do, approvals, open
    questions.
 

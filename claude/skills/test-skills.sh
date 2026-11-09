@@ -159,6 +159,9 @@ check "handover: the six parts in order" \
   bash -c 'printf "%s\n" State "Shipped this session" Decisions Next Leftovers "Pending from the user" > "$2/parts"
     grep -oE "^[1-6]\. \*\*[^.]+\.\*\*" "$1" | sed -E "s/^[1-6]\. \*\*(.*)\.\*\*$/\1/" | cmp -s - "$2/parts"' \
   _ "$here/handover/SKILL.md" "$tmp"
+check "handover: a leftover says where it lives" \
+  bash -c 'tr "\n" " " < "$1" | tr -s " " | grep -q "untested paths, each with the file, function or screen it lives in\."' \
+  _ "$here/handover/SKILL.md"
 
 # --- the review rubric the delegate skill hands to every reviewer --------------
 # shellcheck disable=SC2088  # a literal ~ path, matched as text
