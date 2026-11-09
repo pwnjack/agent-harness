@@ -75,10 +75,9 @@
 whenever a non-worker Claude session starts, including a scripted
 `claude -p`. The hook writes a temporary file beside the settings and renames
 it after filtering, preserving the file mode. Failed copies, filters or
-renames leave the settings untouched and do not block startup. The
-orchestrator proposes Fable with a reason and, once the user agrees, runs it
-as a worker or leaves the user to switch with `/model`; `/advisor fable`, when
-the user asks for it, is enabled only in the one session doing the work.
+renames leave the settings untouched and do not block startup.
+`/advisor fable`, when the user asks for it, is enabled only in the one
+session doing the work.
 
 Claude workers launched by `pane.sh` get `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1`
 and `HARNESS_LEAF=1` through the `--settings` `env` object, which also turns

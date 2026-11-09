@@ -28,7 +28,8 @@ Then choose the effort for this task, whatever the role, from `low`,
 - `medium`: most implementation, exploration and routine review.
 - `high`: substantial or security-bearing review, verification,
   edge-case-heavy work in existing code.
-- `xhigh`: only on the largest model allowed, once `high` fell short.
+- `xhigh`: only once `high` fell short and no larger model may run (`sol`,
+  or Opus after the user declined `fable`).
 
 When a worker falls short, first make sure it can check its own work (a
 test, build or script), then raise the effort one level, then move up a
@@ -42,7 +43,7 @@ skill the model lacks. Past Opus at `high`, propose `fable` rather than
 - Only `haiku`, `sonnet`, `opus` and `luna`, `terra`, `sol` run freely. Any
   other name (`fable`, `astra`, anything new) runs only when the user asks
   for it by name, and `pane.sh` refuses it without `DELEGATE_EXPENSIVE=1`.
-  Propose `fable`, with the reason, for a major refactor, migration or
+  Propose `fable`, with the reason, for a major refactor or migration, an
   architecture plan, or when Opus at `high` fell short.
   Never `max`, and never `ultra` (it lets Codex delegate).
 
@@ -145,9 +146,9 @@ Nothing is committed unless the user asks.
 
 Its skills name the Agent tool; "dispatch a subagent" is a role, and inside
 Herdr each one runs through `pane.sh` (a hook refuses the Agent tool there).
-Its tiers map onto the model table: cheap, standard and most capable are its
-three rows, except that a cheap-tier implementer or reviewer takes the second
-row (the first is read-only work only); effort is chosen per task as above.
+Ignore its tier names: pick each dispatch from the table by its work, never
+below `sonnet` for an implementer or reviewer; effort is chosen per task as
+above.
 
 - **Which executor.** Use subagent-driven development for plans with several
   substantial tasks. A small plan runs inline (`executing-plans`) with the one

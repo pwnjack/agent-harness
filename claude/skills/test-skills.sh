@@ -7,6 +7,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 claude=$(dirname "$here")
+repo=$(dirname "$claude")
 tmp=$(mktemp -d) || exit 1
 trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
@@ -169,9 +170,9 @@ check "delegate: launches name pane.sh under the harness link" \
 check "delegate: the rubric is report-only" grep -q 'edit no file' "$here/delegate/review.md"
 
 # --- no pinned model identifiers in instruction text ---------
-check "no pinned model ids in skill or instruction text" \
-  bash -c '! grep -rEq "claude-(opus|sonnet|haiku|fable)-[0-9]|gpt-[0-9]" "$1" "$2" --include="*.md"' \
-  _ "$here" "$claude/CLAUDE.global.md"
+check "no pinned model ids in skill, instruction or manual text" \
+  bash -c '! grep -rEq "claude-(opus|sonnet|haiku|fable)-[0-9]|gpt-[0-9]" "$1" "$2" "$3" --include="*.md"' \
+  _ "$here" "$claude/CLAUDE.global.md" "$repo/docs/internals"
 
 # --- settings: valid JSON, and no listed plugin without its marketplace --------
 # Built-in marketplaces ship with Claude Code and never appear in
