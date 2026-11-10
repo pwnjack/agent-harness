@@ -7,15 +7,20 @@ is not a framework and makes no promise of stability.
 
 ## What is in it
 
-- **Global instructions** for both agents (`claude/CLAUDE.global.md`,
-  `codex/AGENTS.global.md`): how to delegate, verify, learn and end a session.
-- **Skills** (`claude/skills/`):
-  - `delegate` hands implementation, review or exploration to another model
-    in a visible pane, and gets non-trivial changes reviewed by the other
-    model family.
-  - `compound-learning` turns a correction into the narrowest lasting fix.
-  - `wrap-up` cleans up at the end of a session and `handover` writes the
-    note the next session starts from.
+- **Global instructions** for both agents (`claude/CLAUDE.global.md`): write
+  the least code that solves the whole problem, and the loop below.
+- **Skills** (`claude/skills/`), each a command for the user and a step the
+  agent takes on its own:
+  - `design` brainstorms an idea, has `grill` challenge it, and writes a spec.
+  - `write-plan` turns the spec into small, checkable tasks.
+  - `build` implements them, directly or through workers (`delegate`, each in
+    a visible pane).
+  - `review` gets the change reviewed blind by the other model family and
+    fixes what holds.
+  - `wrap-up` cleans up at the end of a session, `handover` writes the note
+    the next session starts from, and `learn` turns a correction into the
+    narrowest lasting fix, in the harness itself when that is where it
+    belongs.
 - **Hooks** (`claude/hooks/`) that refuse a few commands known to go wrong:
   `pkill -f` matching its own shell, a `git commit` chained after a pipeline
   without `pipefail`, and the Agent tool where workers should run in panes.
@@ -46,14 +51,13 @@ already in the way is moved aside, never deleted. To undo it all, follow
 ## Finding your way
 
 - [`docs/internals/setup.md`](docs/internals/setup.md): wiring, settings,
-  plugins, removal.
+  removal.
 - [`docs/internals/delegation.md`](docs/internals/delegation.md): panes,
   models, reviews.
-- [`docs/internals/session.md`](docs/internals/session.md): wrap-up and
-  handover.
+- [`docs/internals/session.md`](docs/internals/session.md): the loop,
+  wrap-up and handover.
 - [`docs/internals/brain.md`](docs/internals/brain.md): the memory repository
   and the learning skill.
-- [`docs/internals/tests.md`](docs/internals/tests.md): the test suites.
 
 `CLAUDE.md` and `AGENTS.md` at the root are the instructions agents read when
 they work on this repository itself.

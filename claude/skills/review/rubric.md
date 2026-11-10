@@ -6,6 +6,9 @@ A reviewer reads this from its brief. Report findings only; edit no file.
 
 - Review what the brief names: a diff, a commit, a branch, or, for a lean
   review, whole files or folders.
+- When the brief names a spec or plan, read it first. Something it requires
+  that the change does not do, or does differently, is a `must`; something
+  it rules out that the change adds is a `should`.
 - Read the code the change touches, not only the diff: callers of every
   changed function, what it calls, its tests and docs. When a signature,
   output or behaviour changes, grep every caller; untouched code can break.

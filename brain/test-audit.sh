@@ -310,4 +310,58 @@ if [ "$result" -eq 1 ] \
   ok 'failed file scan: reported while remaining files are scanned'
 else no 'failed file scan: reported while remaining files are scanned'; fi
 
+# A backticked home path that is gone is a warning; one that exists is not.
+rm -f -- "$tmp/bin/grep"
+fixture
+mkdir -p -- "$HOME/kept"
+printf 'See `~/kept` and `~/gone/file.md`, run `~/gone/tool <arg>`, glob `~/gone/?.md` `~/gone/[ab].md` `~/gone/*.md`.\n' > "$memory/note.md"
+audit
+if [ "$result" -eq 0 ] && exact 'WARN -home-u-proj/memory/note.md: cites missing ~/gone/file.md'; then
+  ok 'cited home path: missing one warned; existing ones, commands and globs ignored'
+else no 'cited home path: missing one warned; existing ones, commands and globs ignored'; fi
+
+# --here: the main checkout's memory from a subdirectory or a linked worktree,
+# the physical directory outside Git, and silence without a brain or a memory.
+here_audit() { # directory
+  result=0
+  (cd -- "$1" && bash "$here/audit.sh" --here) > "$tmp/output" 2>&1 || result=$?
+}
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+# The audit skips keys that start with -tmp, so these checkouts live elsewhere.
+work=$(mktemp -d /var/tmp/test-audit.XXXXXX) || exit 1
+trap 'rm -rf -- "$tmp" "$work"' EXIT
+mkdir -p -- "$work/repo.with_dots/sub/dir" "$work/plain"
+git init -q -b main -- "$work/repo.with_dots" || exit 1
+git -C "$work/repo.with_dots" -c user.name=T -c user.email=t@example.org commit -q --allow-empty -m fixture || exit 1
+git -C "$work/repo.with_dots" worktree add -q --detach -- "$work/linked" || exit 1
+root=$(cd -- "$work/repo.with_dots" && pwd -P)
+key=$(printf '%s' "$root" | LC_ALL=C tr -c '[:alnum:]' '-')
+plain=$(printf '%s' "$(cd -- "$work/plain" && pwd -P)" | LC_ALL=C tr -c '[:alnum:]' '-')
+rm -rf -- "$projects"
+mkdir -p -- "$projects/$key/memory"
+printf 'unlisted\n' > "$projects/$key/memory/stray.md"
+here_audit "$root/sub/dir"
+if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then ok '--here: silent without a brain'
+else no '--here: silent without a brain'; fi
+mkdir -p -- "$XDG_STATE_HOME/agent-brain.git"
+for dir in "$root/sub/dir" "$work/linked"; do
+  here_audit "$dir"
+  if [ "$result" -eq 1 ] && exact "ERROR $key/memory/stray.md: not in MEMORY.md"; then
+    ok "--here: audits the main checkout's memory from ${dir#"$work/"}"
+  else no "--here: audits the main checkout's memory from ${dir#"$work/"}"; fi
+done
+here_audit "$work/plain"
+if [ "$result" -eq 0 ] && [ ! -s "$tmp/output" ]; then ok '--here: silent without a memory directory'
+else no '--here: silent without a memory directory'; fi
+mkdir -p -- "$projects/$plain/memory"
+printf 'unlisted\n' > "$projects/$plain/memory/stray.md"
+here_audit "$work/plain"
+if [ "$result" -eq 1 ] && exact "ERROR $plain/memory/stray.md: not in MEMORY.md"; then
+  ok '--here: outside Git audits the physical directory'
+else no '--here: outside Git audits the physical directory'; fi
+(unset XDG_STATE_HOME; mkdir -p -- "$HOME/.local/state/agent-brain.git"; cd -- "$work/plain" && bash "$here/audit.sh" --here) > "$tmp/output" 2>&1 && result=0 || result=$?
+if [ "$result" -eq 1 ]; then ok '--here: finds the brain under the default state directory'
+else no '--here: finds the brain under the default state directory'; fi
+
 exit "$fail"

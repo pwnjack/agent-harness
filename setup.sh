@@ -10,9 +10,9 @@
 # --brain opts this Linux machine into private memory commits and auto-dream.
 #
 # Links: this repo -> ~/.claude/harness, claude/skills/*/ -> ~/.claude/skills/,
-# claude/CLAUDE.global.md -> ~/.claude/CLAUDE.md,
-# codex/AGENTS.global.md -> ~/.codex/AGENTS.md (CLAUDE_CONFIG_DIR and CODEX_HOME
-# are honoured, as the apply scripts do). Anything already at a link target is
+# claude/CLAUDE.global.md -> ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md, one
+# file for both agents (CLAUDE_CONFIG_DIR and CODEX_HOME are honoured, as the
+# apply scripts do). Anything already at a link target is
 # moved — never deleted — into ~/.local/state/dotfiles-agents-backup/<time>/.
 # Links into this repo whose target is gone (a removed skill or hook) are
 # deleted.
@@ -117,28 +117,13 @@ if have claude; then
   done
   link "$repo/claude/CLAUDE.global.md" "$claude_dir/CLAUDE.md"
   run bash "$repo/claude/apply-settings.sh"
-
-  # Plugins named in the tracked settings: add their marketplaces, then install.
-  # Listing them initializes Claude's own state, so a dry run skips the query
-  # and shows every step as it would run on a fresh machine.
-  have_mkt=
-  $dry || have_mkt=$(claude plugin marketplace list --json 2>/dev/null | jq -r '.[].name' || true)
-  while IFS=$'\t' read -r name src; do
-    grep -qxF -- "$name" <<<"$have_mkt" || run claude plugin marketplace add "$src"
-  done < <(jq -r '(.extraKnownMarketplaces // {}) | to_entries[]
-                  | [.key, (.value.source | .repo // .url)] | @tsv' "$repo/claude/settings.json")
-  have_plug=
-  $dry || have_plug=$(claude plugin list --json 2>/dev/null | jq -r '.[].id' || true)
-  while read -r plugin; do
-    grep -qxF -- "$plugin" <<<"$have_plug" || run claude plugin install "$plugin" --scope user
-  done < <(jq -r '.enabledPlugins | to_entries[] | select(.value) | .key' "$repo/claude/settings.json")
 else
   echo "claude: not installed, skipping"
 fi
 
 if have codex; then
   echo "codex: linking harness"
-  link "$repo/codex/AGENTS.global.md" "$codex_dir/AGENTS.md"
+  link "$repo/claude/CLAUDE.global.md" "$codex_dir/AGENTS.md"
   run bash "$repo/codex/apply-config.sh"
   run bash "$repo/codex/apply-hooks.sh"
 else

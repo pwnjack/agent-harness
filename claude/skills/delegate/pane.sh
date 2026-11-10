@@ -26,15 +26,12 @@
 #   NOREPORT 4  worked, no valid report        QUOTA 5  usage limit; pane closed
 #   GONE 6  pane vanished   NOSTART 7  prompt never landed, or a start gate
 #   NOHERDR 8  no pane made  TIMEOUT 124      usage errors exit 2, no verdict
-# The pane stays open on BLOCKED, NOREPORT, NOSTART and TIMEOUT: read it,
-# answer or re-prompt with `herdr agent prompt` (a BLOCKED pane refuses it:
-# press the key its screen shows with `herdr pane send-keys`), then run --wait,
-# and close it with `herdr pane close` when done with it. DELEGATE_KEEP=1 keeps it open on
-# REPORT too, for a fix round that resumes it; QUOTA still closes it. --wait
-# keeps it by default (DELEGATE_KEEP=0 closes it on REPORT); --resume always
-# keeps it. A start blocked by a first-run
-# folder-trust prompt is BLOCKED with the pane kept: answer it there, then
-# close the pane and rerun, because the brief was never sent.
+# Under the verdict comes the report or the worker's screen, then a "next:"
+# line saying what the orchestrator does now (hint, below).
+# The pane stays open on BLOCKED, NOREPORT, NOSTART and TIMEOUT.
+# DELEGATE_KEEP=1 keeps it open on REPORT too, for a fix round that resumes
+# it; QUOTA still closes it. --wait keeps it by default (DELEGATE_KEEP=0
+# closes it on REPORT); --resume always keeps it.
 # A report that breaks the contract (a missing or extra key, concerns as one
 # string, two objects) is NOREPORT: it is moved to <report>.invalid, so a
 # --wait after re-prompting waits for a fresh one. It is judged from one read.
@@ -48,23 +45,23 @@
 # seconds (default 90), or with no flock on PATH, the launch goes ahead without
 # it. --wait and --resume never lock. Needs util-linux flock (Linux only).
 #
-# Claude workers start with Superpowers and the advisor off. HARNESS_LEAF
-# also keeps their SessionStart hook from resetting the user's advisor choice.
-# Codex workers follow the leaf contract in AGENTS.md.
+# Claude workers start with the advisor off. HARNESS_LEAF also keeps their
+# SessionStart hook from resetting the user's advisor choice. Both kinds
+# follow the leaf contract in the global instructions.
 set -uo pipefail
 
 here=$(dirname "$(readlink -f "$0")")
 poll=${DELEGATE_POLL:-3} quiet=${DELEGATE_QUIET:-20} land=${DELEGATE_LAND:-45}
-start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' body= pre= preseq= seq=
+start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' next='' body= pre= preseq= seq=
 
 CLAUDE_STANDARD="haiku sonnet opus"
 ROLES='impl|review|explore|fix'
-CLAUDE_WORKER_SETTINGS='{"enabledPlugins":{"superpowers@anthropic-plugin-directory":false},"env":{"CLAUDE_CODE_DISABLE_ADVISOR_TOOL":"1","HARNESS_LEAF":"1"}}'
+CLAUDE_WORKER_SETTINGS='{"env":{"CLAUDE_CODE_DISABLE_ADVISOR_TOOL":"1","HARNESS_LEAF":"1"}}'
 
 # Where a new worker goes: up to COLUMN_SLOTS beside the orchestrator, then
 # crew tabs of TAB_SLOTS each. Sets $pane; empty when the split or tab failed.
 COLUMN_SLOTS=2 TAB_SLOTS=4 CREW=crew
-# The worker starts in the caller's directory (a worktree, for SDD).
+# The worker starts in the caller's directory.
 split_pane() { # pane direction
   herdr pane split --pane "$1" --direction "$2" --cwd "$PWD" --ratio 0.5 --no-focus --env "HARNESS_ROLE=$role" \
     | jq -r '.result.pane_id // .result.pane.pane_id // empty'
@@ -170,6 +167,20 @@ quota() { screen 8 | grep -qiE "hit your usage limit|(usage|rate) limit (reached
 busy() {
   screen 4 | grep -qE '(^[[:space:]]*|·[[:space:]]*)[0-9]+ (shell|monitor)s?[[:space:]]*(,|·|$)'
 }
+# What the orchestrator does after this verdict; $next, when set, replaces it.
+# The report or screen above it is what the worker says, never evidence.
+hint() { # verdict [kept]
+  if [ -n "$next" ]; then echo "next: $next"; return; fi
+  case $1 in
+    REPORT) echo "next: read the diff and re-run the verification yourself${2:+; then herdr pane close $pane}" ;;
+    BLOCKED) echo "next: read the screen. If the answer is unambiguous and inside the brief, press it with: herdr pane send-keys $pane <key>; otherwise ask the user. Then: $0 --wait $pane $report" ;;
+    NOREPORT) echo "next: once only: herdr agent prompt $pane 'Continue, then write the report.' Then: $0 --wait $pane $report" ;;
+    QUOTA) echo "next: this family is out for the rest of the session; send the task to the other one" ;;
+    NOHERDR) if [ "$kind" = codex ]; then echo "next: not in Herdr, so Codex is unavailable: say so once, then run a Claude worker through the Agent tool with the same brief and effort, its model from the delegate table"
+             else echo "next: not in Herdr. Run the worker through the Agent tool with the same model, effort and brief"; fi ;;
+    *) echo "next: read the screen and tell the user; do not retry silently" ;;
+  esac
+}
 finish() { # verdict exit-code [close]
   local kept=   # the pane stays open unless closed here or already gone
   [ "${3:-}" = close ] || [ "$1" = GONE ] || kept=' kept'
@@ -180,6 +191,7 @@ finish() { # verdict exit-code [close]
   else
     echo "--- screen ---"; screen 40
   fi
+  hint "$1" "$kept"
   [ "${3:-}" = close ] && herdr pane close "$pane" >/dev/null 2>&1
   exit "$2"
 }
@@ -266,11 +278,11 @@ if [ -n "$kind" ]; then
   # NOHERDR means outside Herdr, the only case where a caller may fall back to
   # an invisible worker; a broken Herdr inside a Herdr session is NOSTART.
   if [ "${HERDR_ENV:-}" != 1 ]; then
-    echo "NOHERDR pane= report= model=$model effort=$effort elapsed=0s"; exit 8
+    echo "NOHERDR pane= report= model=$model effort=$effort elapsed=0s"; hint NOHERDR; exit 8
   fi
   if ! command -v herdr >/dev/null || [ -z "${HERDR_PANE_ID:-}" ]; then
     echo "NOSTART pane= report= model=$model effort=$effort elapsed=0s"
-    echo "inside Herdr, but the herdr command or HERDR_PANE_ID is missing"; exit 7
+    echo "inside Herdr, but the herdr command or HERDR_PANE_ID is missing"; hint NOSTART; exit 7
   fi
   dir=${DELEGATE_HANDOFF_DIR:-/tmp/delegate}; mkdir -p "$dir"
   report=$(newreport "$role-$task") || exit 2
@@ -282,13 +294,13 @@ if [ -n "$kind" ]; then
   herdr() { command herdr "$@" 9>&-; }
   place_lock
   pane=$(exec 9>&-; place; echo "$pane")
-  [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; exit 7; }
+  [ -n "$pane" ] || { echo "NOSTART pane= report=$report elapsed=0s"; echo "pane split failed"; hint NOSTART; exit 7; }
   started=0
   herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "${args[@]}" >/dev/null && started=1
   unlock
   if [ "$started" = 0 ]; then
     if screen | grep -qiE 'do you trust|trust this (folder|directory)'; then
-      note="first-run folder trust prompt in $pane: answer it there, then close the pane and rerun (the brief was not sent)"
+      next="first-run folder trust prompt: answer it in $pane, then herdr pane close $pane and rerun the launch (the brief was not sent)"
       finish BLOCKED 3
     fi
     finish NOSTART 7 close

@@ -25,12 +25,6 @@ if "$list"; then
   exit 0
 fi
 
-# Resolve installed templates before HOME changes; suites only read this path.
-if [ -z "${SDD_TEST_SKILLS:-}" ]; then
-  SDD_TEST_SKILLS=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/superpowers/*/skills 2>/dev/null | sort -V | tail -1)
-  export SDD_TEST_SKILLS
-fi
-
 # Keep every suite away from machine state, even if it calls setup.sh.
 export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
 export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"

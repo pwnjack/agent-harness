@@ -1,175 +1,76 @@
 ---
 name: delegate
-description: Hand implementation, review or exploration to another model (Claude or Codex, each in a visible Herdr pane) and get a cross-family review of non-trivial changes. Use for "have codex/sonnet do X", "get codex to review this", /delegate, and before reporting a non-trivial change done.
+description: Hand implementation, review or exploration to another model (Claude or Codex) in a visible Herdr pane. Use for "have codex/sonnet do X", "send this to a worker", /delegate, and whenever the build or review skill hands work off.
 ---
 
 # Delegate
 
-## Choosing the worker: family, model, effort
+Do trivial work, and ambiguous or architectural work, yourself. Hand off what
+a brief can fully describe.
 
-Pick the model by the hardest part of the task. Small models get only work
-whose mistakes are cheap to spot; code edits and judgement calls stay on the
-larger ones:
+## Who
 
-| Work (implementing, reviewing or exploring) | Claude | Codex |
-|---|---|---|
-| Read-only: finding files, reading logs and test output, summarising | `haiku` | `luna` |
-| Well-scoped code (a bug fix, a feature or edit against a clear spec), routine review | `sonnet` | `sol` |
-| Everyday engineering and debugging, migrations, performance, subtle, security-bearing, cross-cutting, this harness, or unsure | `opus` | `sol` |
+Pick the row by the hardest part of the task. The effort is where to start,
+not a rule; a model or effort the user names wins.
 
-A clear spec alone does not make a task Sonnet's: a migration or a
-performance change goes to Opus.
+| Work | Claude | Codex | Effort |
+|---|---|---|---|
+| Read-only: finding files, reading logs and test output, summarising | `haiku` | `luna` | `low` |
+| Well-scoped code against a clear task; routine review | `sonnet` | `sol` | `medium` |
+| Debugging, migrations, performance, security-bearing, cross-cutting, this harness, review of any of those, or unsure | `opus` | `sol` | `high` |
 
-Then choose the effort for this task, whatever the role, from `low`,
-`medium`, `high` and `xhigh`, starting at `medium`:
-
-- `low`: a narrow lookup or edit on a capable model, or a first pass whose
-  outcome a test checks (re-run only the failures higher).
-- `medium`: most implementation, exploration and routine review.
-- `high`: substantial or security-bearing review, verification,
-  edge-case-heavy work in existing code.
-- `xhigh`: only once `high` fell short and no larger model may run (`sol`,
-  or Opus after the user declined `fable`).
-
-When a worker falls short, first make sure it can check its own work (a
-test, build or script), then raise the effort one level, then move up a
-model at a lower effort than the last. Effort cuts missed cases; it adds no
-skill the model lacks. Past Opus at `high`, propose `fable` rather than
-`xhigh`.
-- Use Codex when the spec is self-contained. Use Claude when the work needs
-  this conversation's context or judgement about the repo's conventions.
-- Do trivial work (a line, a rename, a config tweak) and ambiguous or
-  architectural work yourself. A model or effort the user names wins.
-- Only `haiku`, `sonnet`, `opus` and `luna`, `terra`, `sol` run freely. Any
-  other name (`fable`, `astra`, anything new) runs only when the user asks
-  for it by name, and `pane.sh` refuses it without `DELEGATE_EXPENSIVE=1`.
-  Propose `fable`, with the reason, for a major refactor or migration, an
-  architecture plan, or when Opus at `high` fell short.
-  Never `max`, and never `ultra` (it lets Codex delegate).
-
-## Review
-
-Before reporting a non-trivial change done, get one review from the other
-family, its model and effort chosen as above for the diff: Claude's work (yours
-included) goes to Codex, Codex's to Claude. With no usable Codex, a different
-Claude model reviews (`opus` for Sonnet's work, `sonnet` for yours or Opus's);
-say the review was same-family.
-
-The reviewer gets the goal, the acceptance criteria and what to review, never
-the implementer's report or test claims:
-
-- uncommitted work: `git diff HEAD`, plus `git status --short` for new files
-- a commit: `git show <sha>`; a branch: `git diff main...<branch>`
-
-Tell it: "Read `~/.claude/harness/claude/skills/delegate/review.md` and
-follow it. Report findings only; do not edit any file." Check every finding against the code
-yourself, drop what does not hold, and give the user one report that merges the
-verified findings with your own assessment, keeping the rubric's numbers and
-groups. Apply only the findings the user picks, then re-run the verification.
-
-When the user asks for a lean or simplify review of existing code, send the
-same rubric to Codex (a Claude model when Codex is unusable) as role `review`,
-task `lean` or `lean-<area>`, and name the files or folders and "lean review"
-in the brief.
+- Codex when the brief is self-contained; Claude when the work needs judgement
+  about this repository's conventions.
+- A worker that falls short: first make sure it can check its own work (a
+  test, a build, a script). Then one step up: the next effort level, or from
+  `high` the next model at `medium`. With no model above, `sol` goes to
+  `xhigh` and Opus stops. If that falls short too, stop and tell the user.
+- Only the names in the table run freely. Any other (`fable`, `astra`,
+  anything new) runs only when the user asks for it by name, and `pane.sh`
+  refuses it without `DELEGATE_EXPENSIVE=1`. Never effort `max` or `ultra`.
 
 ## The brief
 
-Workers share none of this conversation. Every brief:
+Workers share none of this conversation. Write the brief to
+`/tmp/delegate/<role>-<task>.brief.md`:
 
 ```
 [LEAF WORKER — DO NOT DELEGATE]
 ## Goal          what must be true when done
-## Context       repo path, relevant files, constraints; read the repo's AGENTS.md/CLAUDE.md
+## Context       repo path, the spec or plan file and the task number, relevant files, constraints
 ## Out of scope  what not to touch
 ## Acceptance criteria
 ## Verification  exact commands and expected output
 ```
 
-Codex's sandbox blocks some sockets, so a suite that needs them (for example
-`systemd-analyze` in a setup test) fails there. Tell a Codex worker to run the
-suites in its sandbox without asking to escalate, name the expected sandbox
-failure, and run the full suite yourself afterwards.
+A worker leaves its changes uncommitted; you commit after checking them.
+Codex's sandbox blocks some sockets and the network: install dependencies and
+fetch data first, name any check that cannot pass in the sandbox, and run
+that check yourself afterwards.
 
-## Running a worker
+## Running it
 
-Inside Herdr (`HERDR_ENV=1`) every worker, Claude or Codex, implementer,
-reviewer or read-only explorer, runs in a visible pane; never the Agent tool.
-Write the brief to `/tmp/delegate/<role>-<task>.brief.md`, then with
-`run_in_background: true`:
+Inside Herdr (`HERDR_ENV=1`) every worker runs in a pane, never the Agent
+tool. With `run_in_background: true`:
 
 ```bash
-~/.claude/harness/claude/skills/delegate/pane.sh claude <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
-~/.claude/harness/claude/skills/delegate/pane.sh codex <alias> <effort> <role> <task> /tmp/delegate/<role>-<task>.brief.md
+~/.claude/harness/claude/skills/delegate/pane.sh <claude|codex> <model> <effort> <role> <task> <brief>
 ```
 
-The pane is named `<role>-<model>-<task>` (`impl-sonnet-privacy`,
-`review-sol-privacy`) so the user reads it at a glance. Role is `impl`,
-`review`, `explore` or `fix`. Task is one or two `a-z0-9-` words naming the
-work, the same for an implementer and its reviewer; it never repeats the role,
-the family or the alias (the script refuses that), and the name fits 32
-characters. The script opens a pane beside you, hands over the brief, asks
-for a JSON report, and exits with one verdict line (meanings in the script
-header):
+Role is `impl`, `review`, `explore` or `fix`. Task is one or two `a-z0-9-`
+words naming the work, the same for an implementer and its reviewer; the pane
+is named `<role>-<model>-<task>`.
 
-- `REPORT`: the report is printed; `jq . <report>` for the rest.
-- `BLOCKED`: the worker waits on interactive input (an approval or question
-  menu), and Herdr refuses `herdr agent prompt` there with `agent_blocked`.
-  Read the printed screen and press the option it shows with
-  `herdr pane send-keys <pane> <key>` (such as `y`), only when the answer is
-  unambiguous and inside the brief, otherwise ask the user; then rerun with
-  `--wait <pane> <report>`.
-  A first-run folder-trust prompt is the exception: the brief was never sent,
-  so once it is answered, close the pane and rerun the launch.
-- `NOREPORT`: no valid report (a malformed one is moved to `<report>.invalid`
-  and the bad keys printed). Prompt once for the report only, then `--wait`.
-- `QUOTA`: that family is out for the rest of the session; re-route.
-- `NOSTART`, `GONE`, `TIMEOUT`: read the printed screen and report; do not
-  silently retry. A `TIMEOUT` may be an idle Claude worker whose background
-  shell never ended.
-- `NOHERDR`: not in a Herdr session (never returned inside one). Claude
-  workers fall back to the Agent tool with the same choice and brief (`model`
-  set to the alias, `effort` to the chosen effort, `run_in_background: true`);
-  Codex is unavailable, so say so once and take the Claude route.
+The script prints one verdict line, then the report or the worker's screen,
+then a `next:` line. Do what `next:` says. Report the model and effort from
+the verdict line.
 
-A verdict line ending in `kept` left its pane open: close it with
-`herdr pane close <pane>` once you are done with it. Report the model and
-effort from the verdict line.
+For a fix round on the same worker, launch it with `DELEGATE_KEEP=1`, write
+the findings to a file and run `pane.sh --resume <pane> <file>`. After two
+rounds, start a fresh worker one step up.
 
 ## After any worker
 
-Read the diff and re-run the verification commands yourself: a worker's
+Read the diff and re-run the verification commands yourself. A worker's
 `tests_run` is a claim, not evidence, and so is any statement about existing
-code ("the form already sends it"): check those the change depends on.
-Nothing is committed unless the user asks.
-
-## Superpowers
-
-Its skills name the Agent tool; "dispatch a subagent" is a role, and inside
-Herdr each one runs through `pane.sh` (a hook refuses the Agent tool there).
-Ignore its tier names: pick each dispatch from the table by its work, never
-below `sonnet` for an implementer or reviewer; effort is chosen per task as
-above.
-
-- **Which executor.** Use subagent-driven development for plans with several
-  substantial tasks. A small plan runs inline (`executing-plans`) with the one
-  blind review from the other family at the end.
-- **Briefs.** Never write or edit one by hand: `sdd-brief.sh` (run from the
-  worktree; usage in its header) fills SDD's own templates and prints the
-  path for `pane.sh`. Review briefs are blind by construction; exit 4 means
-  the plugin's template changed and the script needs updating.
-- **Workspace.** A worktree (`using-git-worktrees`): the implementer brief
-  tells the worker to commit there, the one case a Codex leaf commits.
-- **Implementer.** Its JSON `summary` starts with SDD's status word. Its launch
-  carries `DELEGATE_KEEP=1` (`--wait` and `--resume` keep the pane by
-  default), so the pane survives for fix rounds.
-- **Fix rounds.** 1-3: write the findings to a file, then
-  `pane.sh --resume <pane> <file>` (a fresh report path, pane kept). 4-5: a
-  fresh pane, escalated as "When a worker falls short" says. Close the pane when
-  the task review passes.
-- **Reviewers.** Task review and re-review: the other family from that task's
-  implementer. Final review: the other family to the implementers, on the
-  whole branch; this is the review above, reported once, and its notes file
-  ends with the rubric line from Review. Keep a plan's implementers to one
-  family; if both implemented, each family reviews it.
-- `requesting-code-review` is the review above; `dispatching-parallel-agents`
-  is one pane per agent. Never nest an orchestrator: workers are leaves.
+code ("the form already sends it"): check the ones the change depends on.

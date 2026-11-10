@@ -110,6 +110,11 @@ gate() { env -u HERDR_ENV -u HERDR_PANE_ID -u DELEGATE_EXPENSIVE ${OPTIN:+DELEGA
   "$here/pane.sh" "$@" >/dev/null 2>&1; echo $?; }
 check() { if [ "$1" = "$2" ]; then echo "ok   gate $3"; else echo "FAIL gate $3: exit $1 want $2"; fail=1; fi; }
 b=$tmp/brief.md
+# Outside Herdr the hint keeps a Claude worker's model and sends a Codex one to the table.
+noherdr() { env -u HERDR_ENV -u HERDR_PANE_ID CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" "$here/pane.sh" "$@" 2>/dev/null | tail -1; }
+if [[ $(noherdr claude sonnet medium impl slug "$b") == 'next: '*'same model'* ]] \
+   && [[ $(noherdr codex sol medium impl slug "$b") == 'next: '*'Codex is unavailable'*'delegate table'* ]]
+then echo "ok   gate NOHERDR: next keeps a Claude model, re-routes a Codex one"; else echo "FAIL gate NOHERDR: wrong next line"; fail=1; fi
 check "$(gate codex medium impl slug "$b")"            2 "missing alias"
 check "$(gate codex sol ultra impl slug "$b")"               2 "ultra refused"
 check "$(OPTIN=1 gate codex astra ultra impl slug "$b")"     2 "ultra refused even with opt-in"
@@ -325,6 +330,13 @@ verdict() {
   if [ $(( SECONDS - t0 )) -gt "${CASE_BUDGET:-5}" ]; then
     echo "FAIL pane $sc: took $(( SECONDS - t0 ))s, over ${CASE_BUDGET:-5}s"; fail=1
   fi
+  # Every verdict ends in what to do next; only a kept pane is to be closed.
+  local hint=${out##*$'\n'} wantclose=no hasclose=no
+  [[ $hint == 'next: '* ]] || { echo "FAIL pane $sc: no next line, last was '$hint'"; fail=1; }
+  [ "$word" = REPORT ] && [ "$wantkept" = yes ] && wantclose=yes
+  [[ $hint == *'herdr pane close'* ]] && [ "$word" = REPORT ] && hasclose=yes
+  [ "$hasclose" = "$wantclose" ] || { echo "FAIL pane $sc: close hint $hasclose, want $wantclose"; fail=1; }
+  last=$out
 }
 mkdir -p "$tmp/handoff"
 verdict happy       0 REPORT   yes
@@ -336,18 +348,13 @@ if grep -qx -- claude "$tmp/state-claude/start" && grep -A1 -x -- --model "$tmp/
 then echo "ok   pane claude: launched as a sonnet leaf worker"; else echo "FAIL pane claude: launch args $(cat "$tmp/state-claude/start")"; fail=1; fi
 if grep -qx -- codex "$tmp/state-happy/start" && grep -A1 -x -- -m "$tmp/state-happy/start" | grep -qx gen9-sol
 then echo "ok   pane codex: launched with the resolved model"; else echo "FAIL pane codex: launch args $(cat "$tmp/state-happy/start")"; fail=1; fi
-# The pane opens in the caller's directory (an SDD worktree).
+# The pane opens in the caller's directory.
 if grep -A1 -x -- --cwd "$tmp/state-happy/split" | tail -1 | grep -qxF -- "$PWD"
 then echo "ok   pane split: opens in the caller's directory"; else echo "FAIL pane split: args $(cat "$tmp/state-happy/split")"; fail=1; fi
-# Claude workers start with Superpowers and the advisor disabled and HARNESS_LEAF set.
+# Claude workers start with the advisor disabled and HARNESS_LEAF set.
 if grep -A1 -x -- --settings "$tmp/state-claude/start" | tail -1 \
-     | jq -e '.enabledPlugins["superpowers@anthropic-plugin-directory"] == false
-              and .env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL == "1"
-              and .env.HARNESS_LEAF == "1"' >/dev/null 2>&1
+     | jq -e '.env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL == "1" and .env.HARNESS_LEAF == "1"' >/dev/null 2>&1
 then echo "ok   claude worker launch: advisor disabled and leaf marked"; else echo "FAIL claude worker launch: missing worker settings"; fail=1; fi
-# Codex launch arguments omit Superpowers settings.
-if ! grep -q superpowers "$tmp/state-happy/start"
-then echo "ok   pane codex: launch arguments omit Superpowers settings"; else echo "FAIL pane codex: unexpected Superpowers launch setting"; fail=1; fi
 missing=
 for k in status summary files_changed commands_run tests_run blockers concerns; do
   grep -q "\b$k\b" "$tmp/state-claude/msg" || missing="$missing $k"
@@ -555,6 +562,8 @@ LAND=0 verdict idlequota 5 QUOTA yes  # rejected before it ever started
 verdict mentions    3 BLOCKED  no     # a task that talks about limits is not a quota hit
 verdict tailmention 3 BLOCKED  no     # not even with the words at the bottom of the screen
 verdict earlyblock  3 BLOCKED  no     # an approval question before the first poll
+if [[ ${last##*$'\n'} == *"send-keys p1 "*"pane.sh --wait p1 $tmp/handoff/impl-t-earlyblock-"* ]]
+then echo "ok   pane blocked: next names the key press and the --wait to run"; else echo "FAIL pane blocked: next was '${last##*$'\n'}'"; fail=1; fi
 QUIET=0 verdict noreport 4 NOREPORT no
 # Inside the windows: a prompt that starts a few polls late is not NOSTART, and
 # a report that trails the last turn by a few polls is REPORT, not NOREPORT.
@@ -590,6 +599,8 @@ LAND=0 verdict nostart 7 NOSTART  no
 verdict gate        7 NOSTART  no
 verdict splitfail   7 NOSTART  no
 verdict trustblock  3 BLOCKED  no    # a first-run trust prompt stays answerable
+if [[ $last == *'next: first-run folder trust prompt'*'rerun the launch'* ]]
+then echo "ok   pane trustblock: next says to rerun, not to wait"; else echo "FAIL pane trustblock: next was '${last##*$'\n'}'"; fail=1; fi
 verdict startfail   7 NOSTART  yes   # any other start failure still closes the pane
 verdict gone        6 GONE     no
 verdict wait        0 REPORT   no  --wait p1 "$tmp/handoff/w.json"   # --wait allows an initial blocked grace period and keeps the pane

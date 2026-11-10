@@ -5,7 +5,7 @@
 | Tracked | Live location | How |
 |---|---|---|
 | repository root | `~/.claude/harness` | symlink to the clone |
-| `claude/CLAUDE.global.md` | `~/.claude/CLAUDE.md` | symlink |
+| `claude/CLAUDE.global.md` | `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` | symlinks; one file for both agents |
 | `claude/skills/*/` | `~/.claude/skills/*` | symlinks |
 | `claude/hooks/agent-guard.sh` | named in the settings | run in place |
 | `claude/hooks/pkill-guard.sh` | named in the settings | run in place on every Bash call |
@@ -14,7 +14,6 @@
 | `claude/hooks/advisor-reset.sh` | named in the settings | run in place at non-worker startup |
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |
-| `codex/AGENTS.global.md` | `~/.codex/AGENTS.md` | symlink |
 | `codex/*.toml` | `~/.codex/config.toml` | merged by `codex/apply-config.sh` through `lib/toml-merge.sh` |
 | `codex/hooks/sidebar.sh` | named in `~/.codex/hooks.json` | merged by `codex/apply-hooks.sh` |
 | `herdr/sidebar.toml` | Herdr's `config.toml` | merged by `herdr/apply-config.sh` through `lib/toml-merge.sh` |
@@ -31,7 +30,6 @@ instead of deleting it, deletes links into this repo whose target is gone,
 lets Herdr install its own agent-state hooks, and sets the clone's
 `core.hooksPath` to `githooks` when the copy has a `.git` entry.
 
-- The global files are named `CLAUDE.global.md` and `AGENTS.global.md`.
 - Live settings are regular files. Edit the tracked file, then run the apply
   script.
 - `<config>` is `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`, resolved once by setup
@@ -40,7 +38,7 @@ lets Herdr install its own agent-state hooks, and sets the clone's
   `XDG_CONFIG_HOME`.
 - The harness link is `$HOME/.claude/harness`, created when Claude or Codex is
   installed.
-- Setup never exports `CLAUDE_CONFIG_DIR`; `test-setup.sh` checks this.
+- Setup never exports `CLAUDE_CONFIG_DIR`.
 - `claude/apply-settings.sh` merges objects key by key. Permission `allow`,
   `ask` and `deny` arrays are ordered unions: live entries first, then tracked
   entries, without duplicates. Hooks have the merging rule below; other arrays
@@ -60,9 +58,9 @@ Symlinked `.git` entries and foreign repositories are also refused.
 The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
 vdirsyncer data), the Agent-tool guard hook, the `pkill -f` guard hook, the
-commit-after-pipe guard hook, the advisor-reset hook, the status line, the
-plugin list, empty commit and pull request attribution, the fullscreen TUI and
-push notifications from agents.
+commit-after-pipe guard hook, the advisor-reset hook, the status line, empty
+commit and pull request attribution, the fullscreen TUI and push notifications
+from agents.
 `codex/statusline.toml` is the tracked slice of Codex's `config.toml`;
 `codex/features.toml` sets `memories = false`.
 
@@ -72,22 +70,20 @@ text).
 
 ## Context budget
 
-Add text to `CLAUDE.global.md`, `AGENTS.global.md`, a project `CLAUDE.md`,
-the memory index, or an enabled plugin's skill listing and session hooks only
-if every task needs it; otherwise put it in a skill or in `docs/internals/`.
+Add text to `CLAUDE.global.md`, a project `CLAUDE.md` or the memory index
+only if every task needs it; otherwise put it in a skill or in
+`docs/internals/`. A plugin's skill listing and session hooks load in every
+session too, so a plugin is enabled in the project that needs it, not here.
 Tracked files are a manual for the agent: they describe what exists and how
 to use it. Decisions, lessons, traps and history go to memory.
 
-`test-budgets.sh` caps both global files at their recorded byte budgets,
-fails on dated history in tracked Markdown, and checks shell scripts for
-non-portable flags. The six files in `EXEMPT` skip the portability check;
-new scripts target Bash 3.2 and jq.
+`test-budgets.sh` caps the global file at its recorded byte budget, fails on
+dated history in tracked Markdown, and checks shell scripts for non-portable
+flags. The four files in `EXEMPT` skip the portability check; new scripts
+target Bash 3.2 and jq.
 
-## Plugins
-
-Superpowers is the only plugin: listed in the tracked settings and installed
-by `setup.sh`. `pane.sh` starts Claude workers without it. Its plans and specs
-in `docs/superpowers/` stay local and untracked.
+Specs and plans for this repository live in `docs/specs/`, local and
+untracked.
 
 ## Status lines and sidebar
 
@@ -218,7 +214,7 @@ if [ -L "$config/CLAUDE.md" ] \
   rm -- "$config/CLAUDE.md"
 fi
 if [ -L "$codex_dir/AGENTS.md" ] \
-   && [ "$(readlink "$codex_dir/AGENTS.md")" = "$harness/codex/AGENTS.global.md" ]; then
+   && [ "$(readlink "$codex_dir/AGENTS.md")" = "$harness/claude/CLAUDE.global.md" ]; then
   rm -- "$codex_dir/AGENTS.md"
 fi
 if [ -L "$HOME/.claude/harness" ] \
@@ -236,7 +232,7 @@ sidebar hook is removed from every event in `hooks.json`; other Codex hooks
 survive, and a `hooks.json` that is not a JSON object with a `hooks` object
 is left alone. The block is safe to run again after removal. Only skill and
 instruction symlinks pointing at this clone are removed. The brain worktree, its `.git` file and its git
-directory remain, with automatic commits disabled. Merged preferences, plugin
-registrations, installed plugins and Codex's TOML settings stay; review them against
+directory remain, with automatic commits disabled. Merged preferences and
+Codex's TOML settings stay; review them against
 `claude/settings.json` and `codex/*.toml` to revert those too. The clone's
 `core.hooksPath` stays local to that clone.

@@ -2,9 +2,8 @@
 # Keep always-loaded instructions small and new shell code portable to macOS.
 set -uo pipefail
 
-BUDGET_CLAUDE_GLOBAL=1824
-BUDGET_AGENTS_GLOBAL=2094
-EXEMPT='claude/statusline.sh claude/hooks/test-agent-guard.sh claude/skills/delegate/pane.sh claude/skills/delegate/test-delegate.sh claude/skills/delegate/test-sdd-brief.sh claude/skills/delegate/sdd-brief.sh'
+BUDGET_GLOBAL=5294
+EXEMPT='claude/statusline.sh claude/hooks/test-agent-guard.sh claude/skills/delegate/pane.sh claude/skills/delegate/test-delegate.sh'
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1
 tmp=$(mktemp -d) || exit 1
@@ -25,10 +24,8 @@ budget() {
     printf '  %s: %s bytes (budget %s)\n' "$file" "${bytes:-unreadable}" "$limit"
   fi
 }
-budget "${BUDGET_FILE_CLAUDE:-$repo/claude/CLAUDE.global.md}" "$BUDGET_CLAUDE_GLOBAL" \
-  "budget: CLAUDE.global.md <= $BUDGET_CLAUDE_GLOBAL"
-budget "$repo/codex/AGENTS.global.md" "$BUDGET_AGENTS_GLOBAL" \
-  "budget: AGENTS.global.md <= $BUDGET_AGENTS_GLOBAL"
+budget "${BUDGET_FILE_CLAUDE:-$repo/claude/CLAUDE.global.md}" "$BUDGET_GLOBAL" \
+  "budget: CLAUDE.global.md <= $BUDGET_GLOBAL"
 
 # This is a textual guard, not a shell parser; diagnostics retain file and line.
 # The sed hex-escape arm (an odd run of backslashes before x, so an escaped

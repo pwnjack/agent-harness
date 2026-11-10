@@ -14,14 +14,12 @@ instead. Nothing is pushed or merged that the user has not asked for.
 
 ## Steps, in order
 
-1. **Verify the final state.** Re-run the project's checks and read the
-   output. `git status --short` shows what is uncommitted; `git log
-   --oneline @{upstream}..` shows what is unpushed. Unmerged or unpushed work
-   is never deleted: it goes under pending in the report.
-2. **Learn.** If the user corrected you this session, or a review or a
-   verification found a defect you caused, and the lesson is not yet
-   recorded, run the `compound-learning` skill now.
-3. **Inventory what this session created**, by category, and look at each
+1. **Verify the final state.** `git status --short` shows what is
+   uncommitted; `git log --oneline @{upstream}..` shows what is unpushed.
+   Re-run the project's checks only if the tree changed since they last
+   passed in this session. Unmerged or unpushed work is never deleted: it
+   goes under pending in the report.
+2. **Inventory what this session created**, by category, and look at each
    item before deciding:
 
    | Category | How to look |
@@ -33,7 +31,7 @@ instead. Nothing is pushed or merged that the user has not asked for.
    | Worktrees | `git worktree list` |
    | Branches | `git branch --merged <main>` locally; `git branch -r --merged <main>` on origin |
 
-4. **Clean up**, only what this session made:
+3. **Clean up**, only what this session made:
    - Panes: `herdr pane close <pane>` for finished worker panes. Another
      session's pane is never yours, whatever its state.
    - Processes: find the PID first, then `kill <pid>` in its own call. Stop a
@@ -53,11 +51,15 @@ instead. Nothing is pushed or merged that the user has not asked for.
      stashes you did not create stay.
    - An item that stays gets a reason in the report: a gitignored mockup a
      spec refers to, a worktree the user asked to keep, a stack with data.
-5. **Confirm.** The tree is clean, the current branch and the main branch
+4. **Confirm.** The tree is clean, the current branch and the main branch
    match their origin copies, no worker pane or server of this session is
    left. Show the commands and their output; a claim without output is not
    confirmation.
-6. **Record.** Run the `handover` skill so the next session starts informed.
+5. **Record.** Run the `handover` skill; it writes nothing when nothing
+   passes on.
+6. **Learn.** Run the `learn` skill for every correction, defect or harness
+   friction of this session that is not recorded yet. It is also where a
+   harness improvement gets proposed.
 7. **Report** in three parts: removed, kept and why, pending (for the user
    or the next session). Nothing in the pending part is a cleanup you could
    have done.

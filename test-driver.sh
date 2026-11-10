@@ -17,23 +17,15 @@ cp -- "$repo/test.sh" "$tmp/clone/test.sh"
 cat > "$tmp/clone/test-env.sh" <<'SH'
 #!/usr/bin/env bash
 env | grep -E '^(HERDR_CONFIG_PATH|HERDR_PANE_ID|HERDR_SOCKET_PATH|HARNESS_ROLE|HARNESS_SIDEBAR_SYNC)=' > "$TEST_DRIVER_ENV"
-printf '%s\n' "${SDD_TEST_SKILLS:-}" > "$TEST_DRIVER_SKILLS"
 exit 0
 SH
-# Version ordering must pick 5.10.0 even though 5.9.0 sorts last lexically.
-installed="$CLAUDE_CONFIG_DIR/plugins/cache/fixture/superpowers/5.10.0/skills"
-mkdir -p -- "$installed" "$CLAUDE_CONFIG_DIR/plugins/cache/fixture/superpowers/5.9.0/skills"
 git -C "$tmp/clone" init -q && git -C "$tmp/clone" add test.sh test-env.sh || exit 1
 
-SDD_TEST_SKILLS= TEST_DRIVER_SKILLS="$tmp/skills" TEST_DRIVER_ENV="$tmp/seen" HERDR_CONFIG_PATH="$tmp/sentinel.toml" HERDR_PANE_ID=w1:p1 \
+TEST_DRIVER_ENV="$tmp/seen" HERDR_CONFIG_PATH="$tmp/sentinel.toml" HERDR_PANE_ID=w1:p1 \
   HERDR_SOCKET_PATH="$tmp/herdr.sock" HARNESS_ROLE=worker HARNESS_SIDEBAR_SYNC=1 \
   bash "$tmp/clone/test.sh" > "$tmp/output" 2>&1
 if [ -f "$tmp/seen" ] && [ ! -s "$tmp/seen" ]; then ok 'suites see no inherited Herdr variables'
 else no 'suites see no inherited Herdr variables'; cat -- "$tmp/seen" "$tmp/output" 2>/dev/null; fi
-
-if [ "$(cat -- "$tmp/skills")" = "$installed" ]; then
-  ok 'newest installed templates resolved by version before sandboxing HOME and config'
-else no 'newest installed templates resolved by version before sandboxing HOME and config'; fi
 
 # A git stub gives the driver a successful, empty tracked-file listing.
 mkdir -p -- "$tmp/bin"
