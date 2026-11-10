@@ -314,11 +314,11 @@ else no 'failed file scan: reported while remaining files are scanned'; fi
 rm -f -- "$tmp/bin/grep"
 fixture
 mkdir -p -- "$HOME/kept"
-printf 'See `~/kept` and `~/gone/file.md`, run `~/gone/tool <arg>`.\n' > "$memory/note.md"
+printf 'See `~/kept` and `~/gone/file.md`, run `~/gone/tool <arg>`, glob `~/gone/?.md` `~/gone/[ab].md` `~/gone/*.md`.\n' > "$memory/note.md"
 audit
 if [ "$result" -eq 0 ] && exact 'WARN -home-u-proj/memory/note.md: cites missing ~/gone/file.md'; then
-  ok 'cited home path: missing one warned, existing one and commands ignored'
-else no 'cited home path: missing one warned, existing one and commands ignored'; fi
+  ok 'cited home path: missing one warned; existing ones, commands and globs ignored'
+else no 'cited home path: missing one warned; existing ones, commands and globs ignored'; fi
 
 # --here: the main checkout's memory from a subdirectory or a linked worktree,
 # the physical directory outside Git, and silence without a brain or a memory.

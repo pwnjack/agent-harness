@@ -77,6 +77,8 @@ ends by naming the next:
 `wrap-up` (`handover`, `learn`)
 
 - A skill runs when the user names it or when the work reaches its step.
+  Where your tool does not list it, read
+  `~/.claude/harness/claude/skills/<name>/SKILL.md`.
 - The `delegate` skill decides who does handed-off work. Inside Herdr every
   subagent, read-only exploration included, runs in a visible pane through
   it, never through the Agent tool.

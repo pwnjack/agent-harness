@@ -50,8 +50,9 @@ Run it as role `review` through the `delegate` skill.
 5. Log the yield, one line:
 
    ```bash
+   state=${XDG_STATE_HOME:-$HOME/.local/state}; mkdir -p "$state"
    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%F)" "$(basename "$PWD")" <model>-<effort> <found> <held> <fixed> \
-     >> "${XDG_STATE_HOME:-$HOME/.local/state}/harness-reviews.tsv"
+     >> "$state/harness-reviews.tsv"
    ```
 
 ## Lean review

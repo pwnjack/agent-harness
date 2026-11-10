@@ -125,7 +125,7 @@ audit_project() {
     # A memory citing a home path that is gone has outlived what it describes.
     # Only a whole backticked `~/path` counts: no spaces, placeholders or globs.
     if [ -r "$file" ]; then
-      { grep -oE '`~/[^`[:space:]<>*$]+`' -- "$file" 2>/dev/null || true; } | tr -d '`' | sort -u > "$tmp/cited"
+      { grep -oE '`~/[^]`[:space:]<>*?[$]+`' -- "$file" 2>/dev/null || true; } | tr -d '`' | sort -u > "$tmp/cited"
       while IFS= read -r cited; do
         [ -e "$HOME/${cited#\~/}" ] || printf 'WARN %s/memory/%s: cites missing %s\n' "$key" "$path" "$cited"
       done < "$tmp/cited"

@@ -110,6 +110,11 @@ gate() { env -u HERDR_ENV -u HERDR_PANE_ID -u DELEGATE_EXPENSIVE ${OPTIN:+DELEGA
   "$here/pane.sh" "$@" >/dev/null 2>&1; echo $?; }
 check() { if [ "$1" = "$2" ]; then echo "ok   gate $3"; else echo "FAIL gate $3: exit $1 want $2"; fail=1; fi; }
 b=$tmp/brief.md
+# Outside Herdr the hint keeps a Claude worker's model and sends a Codex one to the table.
+noherdr() { env -u HERDR_ENV -u HERDR_PANE_ID CODEX_MODELS_CACHE="$tmp/real.json" CODEX_CONFIG="$tmp/config-ok.toml" "$here/pane.sh" "$@" 2>/dev/null | tail -1; }
+if [[ $(noherdr claude sonnet medium impl slug "$b") == 'next: '*'same model'* ]] \
+   && [[ $(noherdr codex sol medium impl slug "$b") == 'next: '*'Codex is unavailable'*'delegate table'* ]]
+then echo "ok   gate NOHERDR: next keeps a Claude model, re-routes a Codex one"; else echo "FAIL gate NOHERDR: wrong next line"; fail=1; fi
 check "$(gate codex medium impl slug "$b")"            2 "missing alias"
 check "$(gate codex sol ultra impl slug "$b")"               2 "ultra refused"
 check "$(OPTIN=1 gate codex astra ultra impl slug "$b")"     2 "ultra refused even with opt-in"
@@ -325,11 +330,12 @@ verdict() {
   if [ $(( SECONDS - t0 )) -gt "${CASE_BUDGET:-5}" ]; then
     echo "FAIL pane $sc: took $(( SECONDS - t0 ))s, over ${CASE_BUDGET:-5}s"; fail=1
   fi
-  # Every verdict but a REPORT whose pane is closed ends in what to do next.
-  local wantnext=yes hasnext=no
-  [ "$word" = REPORT ] && [ "$wantkept" = no ] && wantnext=no
-  [[ ${out##*$'\n'} == 'next: '* ]] && hasnext=yes
-  [ "$hasnext" = "$wantnext" ] || { echo "FAIL pane $sc: next line $hasnext, want $wantnext"; fail=1; }
+  # Every verdict ends in what to do next; only a kept pane is to be closed.
+  local hint=${out##*$'\n'} wantclose=no hasclose=no
+  [[ $hint == 'next: '* ]] || { echo "FAIL pane $sc: no next line, last was '$hint'"; fail=1; }
+  [ "$word" = REPORT ] && [ "$wantkept" = yes ] && wantclose=yes
+  [[ $hint == *'herdr pane close'* ]] && [ "$word" = REPORT ] && hasclose=yes
+  [ "$hasclose" = "$wantclose" ] || { echo "FAIL pane $sc: close hint $hasclose, want $wantclose"; fail=1; }
   last=$out
 }
 mkdir -p "$tmp/handoff"

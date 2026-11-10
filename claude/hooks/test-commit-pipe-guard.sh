@@ -33,6 +33,8 @@ for c in 'bun test | tail -5 && git commit -m x' \
          'bun test | tail && git -C /repo commit -m x' \
          'bun test | tee log || exit 1 && git commit -m x' \
          'set +o pipefail; bun test | tail && git commit -m x' \
+         'git commit -m first && bun test | tail && git commit -m second' \
+         'bun test | tail && git commit -m x; set -o pipefail' \
          'git status --short | head; git commit -m x'; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ "$(jq -r .hookSpecificOutput.permissionDecision <<<"$out" 2>/dev/null)" = deny ] \

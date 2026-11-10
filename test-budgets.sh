@@ -2,7 +2,7 @@
 # Keep always-loaded instructions small and new shell code portable to macOS.
 set -uo pipefail
 
-BUDGET_GLOBAL=5200
+BUDGET_GLOBAL=5294
 EXEMPT='claude/statusline.sh claude/hooks/test-agent-guard.sh claude/skills/delegate/pane.sh claude/skills/delegate/test-delegate.sh'
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1

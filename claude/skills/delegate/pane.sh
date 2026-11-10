@@ -168,14 +168,16 @@ busy() {
   screen 4 | grep -qE '(^[[:space:]]*|·[[:space:]]*)[0-9]+ (shell|monitor)s?[[:space:]]*(,|·|$)'
 }
 # What the orchestrator does after this verdict; $next, when set, replaces it.
+# The report or screen above it is what the worker says, never evidence.
 hint() { # verdict [kept]
   if [ -n "$next" ]; then echo "next: $next"; return; fi
   case $1 in
-    REPORT) [ -z "${2:-}" ] || echo "next: herdr pane close $pane, once you are done with it" ;;
+    REPORT) echo "next: read the diff and re-run the verification yourself${2:+; then herdr pane close $pane}" ;;
     BLOCKED) echo "next: read the screen. If the answer is unambiguous and inside the brief, press it with: herdr pane send-keys $pane <key>; otherwise ask the user. Then: $0 --wait $pane $report" ;;
     NOREPORT) echo "next: once only: herdr agent prompt $pane 'Continue, then write the report.' Then: $0 --wait $pane $report" ;;
     QUOTA) echo "next: this family is out for the rest of the session; send the task to the other one" ;;
-    NOHERDR) echo "next: not in Herdr. Run a Claude worker through the Agent tool with the same model, effort and brief; Codex is unavailable, say so once" ;;
+    NOHERDR) if [ "$kind" = codex ]; then echo "next: not in Herdr, so Codex is unavailable: say so once, then run a Claude worker through the Agent tool with the same brief and effort, its model from the delegate table"
+             else echo "next: not in Herdr. Run the worker through the Agent tool with the same model, effort and brief"; fi ;;
     *) echo "next: read the screen and tell the user; do not retry silently" ;;
   esac
 }
