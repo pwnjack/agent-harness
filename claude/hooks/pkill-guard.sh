@@ -5,32 +5,17 @@
 # This refuses them unless the pattern brackets a character ('[n]ext dev'),
 # which no longer matches its own text.
 #
-# A textual guard, not a shell parser. In order: heredoc bodies are dropped,
-# backslash-newlines joined, quoted strings replaced by Q (or QB when they hold
-# a bracketed character), the rest cut into simple commands at newlines,
-# ; | & ( ) and backticks, comments and redirections cut off. A pkill or
-# pgrep word (bare or after a path) with an f option and no bracketed pattern
-# is refused. `echo pkill -f x` unquoted is a known false refusal.
+# A textual guard, not a shell parser. In order: heredoc bodies are dropped
+# and backslash-newlines joined (command-text.sh), quoted strings replaced by
+# Q (or QB when they hold a bracketed character), the rest cut into simple
+# commands at newlines, ; | & ( ) and backticks, comments and redirections cut
+# off. A pkill or pgrep word (bare or after a path) with an f option and no
+# bracketed pattern is refused. `echo pkill -f x` unquoted is a known false
+# refusal.
 set -euo pipefail
 
-command=$(jq -r '.tool_input.command | strings' 2>/dev/null) || exit 0
-[ -n "$command" ] || exit 0
-
-# Drop heredoc bodies: lines after <<WORD (or <<-WORD, quoted or not) up to WORD.
-text=''
-delim=''
-heredoc='<<-?[[:space:]]*["'"'"']?([[:alnum:]_]+)'
-while IFS= read -r line || [ -n "$line" ]; do
-  if [ -n "$delim" ]; then
-    trimmed=${line#"${line%%[![:space:]]*}"}
-    [ "$trimmed" = "$delim" ] && delim=''
-    continue
-  fi
-  [[ $line =~ $heredoc ]] && delim=${BASH_REMATCH[1]}
-  text+="$line"$'\n'
-done <<< "$command"
-
-text=${text//$'\\\n'/ }
+# shellcheck source=claude/hooks/command-text.sh
+. "$(dirname "${BASH_SOURCE[0]}")/command-text.sh"
 
 # Quoted strings become Q, or QB when they hold a bracketed character.
 quoted="('[^']*'|\"[^\"]*\")"

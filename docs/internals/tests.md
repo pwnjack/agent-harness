@@ -76,7 +76,14 @@ commands, including Herdr, so they never install hooks or units on the host.
   outside it, and is registered once after two settings merges.
 - `claude/hooks/test-pkill-guard.sh`: the guard denies `pkill -f` and `pgrep -f`
   without a bracketed pattern, lets other commands and malformed input through
-  silently, and is registered once after two settings merges.
+  silently, sees past a here-string and a heredoc with a hyphenated
+  delimiter, ends a heredoc body only at its exact terminator (leading tabs
+  for `<<-`), and is registered once after two settings merges.
+- `claude/hooks/test-commit-pipe-guard.sh`: the guard denies a `git commit`
+  chained with `&&` or `||` after a pipeline, allows it under
+  `set -o pipefail`, in a separate list or with the pipe after the commit,
+  stays silent on other commands and malformed input, and is registered once
+  after two settings merges with the `pkill -f` guard beside it.
 - `claude/hooks/test-advisor-reset.sh`: startup registration, removal of
   `advisorModel`, worker bypass, atomic replacement with the settings mode
   preserved, failed copies and renames, symlinked settings left untouched,

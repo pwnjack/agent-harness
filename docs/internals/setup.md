@@ -9,6 +9,8 @@
 | `claude/skills/*/` | `~/.claude/skills/*` | symlinks |
 | `claude/hooks/agent-guard.sh` | named in the settings | run in place |
 | `claude/hooks/pkill-guard.sh` | named in the settings | run in place on every Bash call |
+| `claude/hooks/commit-pipe-guard.sh` | named in the settings | run in place on every Bash call |
+| `claude/hooks/command-text.sh` | sourced by the two Bash guards beside themselves | read in place |
 | `claude/hooks/advisor-reset.sh` | named in the settings | run in place at non-worker startup |
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |
@@ -58,8 +60,9 @@ Symlinked `.git` entries and foreign repositories are also refused.
 The tracked `claude/settings.json` carries the `permissions.deny` list that
 keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
 vdirsyncer data), the Agent-tool guard hook, the `pkill -f` guard hook, the
-advisor-reset hook, the status line, the plugin list, empty commit and pull
-request attribution, the fullscreen TUI and push notifications from agents.
+commit-after-pipe guard hook, the advisor-reset hook, the status line, the
+plugin list, empty commit and pull request attribution, the fullscreen TUI and
+push notifications from agents.
 `codex/statusline.toml` is the tracked slice of Codex's `config.toml`;
 `codex/features.toml` sets `memories = false`.
 

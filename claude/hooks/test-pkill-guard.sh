@@ -25,6 +25,7 @@ no() { echo "FAIL $1"; fail=1; }
 run() { jq -n --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}' | bash "$here/pkill-guard.sh" 2>&1; }
 
 nl=$'\n'
+tab=$'\t'
 for c in 'pkill -f "next dev"' 'pkill -f next-server' 'sleep 1; pkill -9 -f "next dev"; echo done' \
          'pgrep -af "next-server|next dev" | xargs kill' 'pkill -u me -f node' 'pkill --full "bun dev"' \
          'cd /tmp && pgrep -fl vite' "pkill -f '[n]ext dev'; pkill -f node" "pkill -f node; pgrep -f '[n]ext'" \
@@ -32,7 +33,9 @@ for c in 'pkill -f "next dev"' 'pkill -f next-server' 'sleep 1; pkill -9 -f "nex
          'kill `pgrep -f next`' 'sudo pkill -f node' 'timeout 5 pkill -f node' "echo start${nl}pkill -f node" \
          'sudo -u root pkill -f node' 'if pgrep -f node; then echo running; fi' \
          'for name in node; do pkill -f "$name"; done' 'pkill -fu1000 node' 'pgrep -fP1234 node' \
-         "pkill \\${nl}-f node" 'pkill -f node # [n]' 'pkill -f node > /tmp/kill[1].log'; do
+         "pkill \\${nl}-f node" 'pkill -f node # [n]' 'pkill -f node > /tmp/kill[1].log' \
+         "cat <<< \"x\"${nl}pkill -f node" "cat <<END-A${nl}body${nl}END-A${nl}pkill -f node" \
+         "cat <<-EOF${nl}body${nl}${tab}EOF${nl}pkill -f node"; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ "$(jq -r .hookSpecificOutput.permissionDecision <<<"$out" 2>/dev/null)" = deny ] \
      && jq -r .hookSpecificOutput.permissionDecisionReason <<<"$out" | grep -q "kill it in its own call"
@@ -44,7 +47,10 @@ for c in "pkill -f '[n]ext dev'" 'pgrep -af "[n]ext-server"' 'kill 606638' 'pgre
          "printf '%s\n' 'pkill -f node'" "# pkill -f node${nl}echo ok" "pgrep -x node${nl}tail -f app.log" \
          'grep -n "pkill -f" notes.md' "printf '%s\n' 'example; pkill -f node'" \
          "cat > /tmp/notes.md <<'EOF'${nl}pkill -f node${nl}EOF${nl}echo written" "pkill -f 'foo([b]ar)'" \
-         "pgrep -x 'node -f worker'" 'pkill -f [n]ode'; do
+         "pgrep -x 'node -f worker'" 'pkill -f [n]ode' \
+         "cat <<\\EOF${nl}pkill -f node${nl}EOF" "cat <<EOF${nl} EOF${nl}pkill -f node${nl}EOF" \
+         "cat <<-EOF${nl}${tab}pkill -f node${nl}${tab}EOF${nl}echo ok" \
+         "cat <<-EOF${nl}  EOF${nl}pkill -f node${nl}EOF"; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ -z "$out" ]; then ok "allowed: $c"; else no "not allowed: $c (rc $rc, out '$out')"; fi
 done
