@@ -3,9 +3,9 @@
 This repository is a public manual for the agent: it describes what exists and
 how to use it. Decisions, lessons, traps and history go to memory, never here.
 Before changing a part, read its file in `docs/internals/`: `setup.md`
-(wiring, settings, plugins, removal), `brain.md` (memory repository, learning
-skill), `delegation.md` (panes, models, advisor), `session.md` (wrap-up and
-handover skills), `tests.md` (suites).
+(wiring, settings, removal), `brain.md` (memory repository, learning skill),
+`delegation.md` (panes, models, advisor), `session.md` (the loop, wrap-up and
+handover). Each test suite says what it covers in its header.
 
 This repository tracks only what was authored here: the skills, hooks, status
 line, brain scripts, Herdr and Codex wiring, global instructions and curated
@@ -13,9 +13,9 @@ settings. Never track logins, memory, caches or tool-written configuration.
 `./setup.sh` links and merges the harness into the installed tools;
 `./setup.sh --dry-run` previews those changes.
 
-- `claude/`: Claude Code global instructions, skills, hooks, status line and
-  settings.
-- `codex/`: Codex global instructions, curated configuration and sidebar hook.
+- `claude/`: the global instructions both agents read, skills, hooks, status
+  line and settings.
+- `codex/`: Codex curated configuration and sidebar hook.
 - `brain/`: private memory audit, commit scripts and user timer templates.
 - `herdr/`: Herdr sidebar layout and reporter.
 - `githooks/`: staged-tree export and the pre-commit test gate.

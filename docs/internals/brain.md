@@ -65,7 +65,9 @@ journalctl --user -u brain-commit
   `ssh-add -l` returning 1 or 2 defers the push, and a failed push logs the
   last ten lines of Git's output and retries next run.
 
-`brain/audit.sh <projects-dir> [project-key...]` is read-only. It reports
+`brain/audit.sh <projects-dir> [project-key...]` is read-only;
+`brain/audit.sh --here` audits the memory of the checkout it runs in and is
+silent when the brain git directory or that memory is absent. It reports
 memories absent from `MEMORY.md`, index links to missing files and secret
 patterns by name, including symlinked Markdown files and nested `MEMORY.md`
 files. Only relative file
@@ -78,8 +80,9 @@ Unreadable files and scan errors are reported without stopping the remaining
 audit. Patterns need no final newline. Findings exit 1; a clean audit exits 0.
 It warns when a `MEMORY.md`
 exceeds 4096 bytes (Claude loads only the start of the index), and when any
-other memory file exceeds 8192 bytes (one fact per file; split it). The commit
-script journals the audit after each commit; audit findings never undo a commit.
+other memory file exceeds 8192 bytes (one fact per file; split it), and when a
+memory cites a backticked `~/` path that no longer exists. The commit script
+journals the audit after each commit; audit findings never undo a commit.
 
 Off switches, independent and history-preserving:
 `systemctl --user disable --now brain-commit.timer` stops automatic commits;
@@ -88,22 +91,21 @@ no-op; deleting `autoDreamEnabled` from the live settings stops auto-dream.
 
 ## Learning
 
-The `compound-learning` skill turns an evidenced correction into exactly one
-lasting prevention, the first that applies of: a check, project
-documentation, a skill, a global instruction, memory. It runs only in the
-main checkout's orchestrator; workers and worktree sessions report lessons
-instead. Harness changes are diff proposals that need the user's yes, then a
-cross-family review in a worktree before merging. Any harness text it adds
-describes only what exists and how to use it; decisions, lessons, traps and
-history go to memory.
+The `learn` skill turns an evidenced correction, defect or harness friction
+into exactly one lasting prevention, the first that applies of: a check,
+project documentation, a skill, a global instruction, memory. A lesson that
+holds in every project goes to the harness, and a memory whose lesson moved
+into a check or a skill is deleted. It runs only in the main checkout's
+orchestrator; workers and worktree sessions report lessons instead. Harness
+changes are diff proposals that need the user's yes, then the `review` skill
+in a worktree before merging.
 
-When the brain git directory exists under `${XDG_STATE_HOME:-$HOME/.local/state}`,
-the skill audits the main checkout's memory, if its directory exists, before
-searching existing guidance. It derives the key from the first entry in
+`audit.sh --here` derives the project key from the first entry in
 `git worktree list --porcelain`, so subdirectories and linked worktrees use
-the main checkout's memory; outside Git it uses the physical project directory.
-The projects directory honours `CLAUDE_CONFIG_DIR`, and each non-alphanumeric
-path character becomes `-`.
+the main checkout's memory; outside Git it uses the physical project
+directory. The projects directory honours `CLAUDE_CONFIG_DIR`, and each
+non-alphanumeric path character becomes `-`.
 
-Its injection guard covers the skill only: native memory capture and
+The skill takes lessons only from the user's words or results observed
+directly. That guard covers the skill only: native memory capture and
 auto-dream bypass it, and the audit does not establish provenance.

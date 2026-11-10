@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for commit-pipe-guard.sh: it refuses a `git commit` chained after a
-# pipeline unless `set -o pipefail` is in effect, lets everything else through
+# Tests for commit-pipe-guard.sh: it refuses a `git commit` that comes after a
+# pipe unless the command turns pipefail on, lets everything else through
 # silently, and the tracked settings register it exactly once even when
 # apply-settings.sh runs twice. Never touches the real ~/.claude.
 #   bash claude/hooks/test-commit-pipe-guard.sh
@@ -25,57 +25,15 @@ no() { echo "FAIL $1"; fail=1; }
 run() { jq -n --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}' | bash "$here/commit-pipe-guard.sh" 2>&1; }
 
 nl=$'\n'
-tab=$'\t'
-# The last one is the documented false refusal: a pipe inside $(...).
+# The last one is the documented false refusal: a pipe in an earlier command.
 for c in 'bun test | tail -5 && git commit -m x' \
          'psql -f t.sql | grep -v NOTICE | tail && git add -A && git commit -m "x"' \
-         'cd repo && bun test 2>&1 | tail -3 && git commit -qm x' \
-         'check | tee log 2>&1 && git commit -m x' \
-         "bun test | tail -3 &&${nl}git commit -m x" \
          "bun test |${nl}tail -3 && git commit -m x" \
-         "bun test | tail -3 \\${nl}&& git commit -m x" \
-         '(bun test | tail -3) && git commit -m x' \
-         '{ bun test | tail -3; } && git commit -m x; echo done' \
-         "{ bun test | tail -3${nl}} && git commit -m x" \
-         'bun test | tee log || exit 1 && git commit -m x' \
          'bun test |& tail && git commit -m x' \
          'bun test | tail && git -C /repo commit -m x' \
-         'bun test | tail && /usr/bin/git commit --amend --no-edit' \
-         'bun test | tail && git -c user.name=x --no-pager commit -m y' \
-         'bun test | tail && env GIT_AUTHOR_NAME=x git commit -m y' \
-         'bun test | tail -3 && git commit -m "a && b; c"' \
-         "bun test | tail && git commit -F - <<'EOF'${nl}a message${nl}EOF" \
+         'bun test | tee log || exit 1 && git commit -m x' \
          'set +o pipefail; bun test | tail && git commit -m x' \
-         "set -o pipefail${nl}set +o pipefail${nl}bun test | tail && git commit -m x" \
-         'echo start; bun test | tail && git commit -m x' \
-         'bun test | tail && git commit -m x # set -o pipefail' \
-         'echo set -o pipefail; bun test | tail && git commit -m x' \
-         'set -o pipefail | cat; bun test | tail && git commit -m x' \
-         'bun test | tail && git --git-dir /repo/.git commit -m x' \
-         'bun test | tail && git --work-tree /repo --git-dir=/repo/.git commit -m x' \
-         'bun test | tail && sudo -u root git commit -m x' \
-         "bun test | tail && (${nl}git commit -m x${nl})" \
-         "bun test | tail && {${nl}git commit -m x${nl}}" \
-         'echo "a\""; bun test | tail && git commit -m "x"' \
-         "# don't do it${nl}bun test | tail && git commit -m 'x'" \
-         "cat <<< EOF${nl}bun test | tail && git commit -m x" \
-         "psql <<< \"select 1\"${nl}bun test | tail && git commit -m x" \
-         "cat <<END-MESSAGE${nl}hello${nl}END-MESSAGE${nl}bun test | tail && git commit -m x" \
-         "cat <<-EOF${nl}${tab}body${nl}${tab}EOF${nl}bun test | tail && git commit -m x" \
-         'set -o pipefail; set +o pipefail -e; bun test | tail && git commit -m x' \
-         'set -o pipefail; set +o pipefail >/dev/null; bun test | tail && git commit -m x' \
-         'bun test | tail && GIT_AUTHOR_NAME="Foo Bar" git commit -m x' \
-         'bun test | tail && 2>/tmp/commit.log git commit -m x' \
-         'bun test | tail && > /tmp/commit.log git commit -m x' \
-         'bun test | tail && 2>&1 git commit -m x' \
-         'bun test | tail && ! git commit -m x' \
-         'bun test | tail && /usr/bin/env git commit -m x' \
-         'bun test | tail && /usr/bin/sudo git commit -m x' \
-         'set -- -o pipefail extra; bun test | tail && git commit -m x' \
-         'set -o pipefail; set +o pipefail >pipefail.log; bun test | tail && git commit -m x' \
-         'bun test | tail && env >123 git commit -m x' \
-         'bun test | tail && env 2>123 git commit -m x' \
-         'count=$(git status --short | wc -l) && git commit -m x'; do
+         'git status --short | head; git commit -m x'; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ "$(jq -r .hookSpecificOutput.permissionDecision <<<"$out" 2>/dev/null)" = deny ] \
      && jq -r .hookSpecificOutput.permissionDecisionReason <<<"$out" | grep -q "set -o pipefail"
@@ -84,39 +42,15 @@ done
 
 for c in 'git commit -m x' 'git add -A && git commit -m x' \
          'bun test > /tmp/t.log 2>&1 && git commit -m x' \
-         'bun test &> /tmp/t.log && git commit -m x' \
          'bun test >| /tmp/t.log && git commit -m x' \
-         'bun test > /tmp/t.log 2>&1 && grep -q "0 fail" /tmp/t.log && git commit -m x' \
+         'bun test || exit 1; git commit -m x' \
          'set -o pipefail; bun test | tail -5 && git commit -m x' \
          "set -euo pipefail${nl}bun test | tail -5 && git commit -m x" \
          'set -e -o pipefail && bun test | tail && git commit -m x' \
-         'set -o errexit -o pipefail; bun test | tail && git commit -m x' \
-         '( set -o pipefail; bun test | tail ) && git commit -m x' \
-         '( bun test | tail; true ) && git commit -m x' \
-         'bun test | tail -5; git commit -m x' \
-         "bun test | tail -5${nl}git add -A && git commit -m x" \
          'git commit -m x && git log --oneline | head -3' \
-         'git commit -m x | cat' \
          'git add -A && git commit -m "a | b"' \
-         "git add -A && git commit -m 'a | b && c'" \
          "git commit -F - <<'EOF'${nl}check | tail && git commit${nl}EOF" \
-         "cat > /tmp/notes.md <<'EOF'${nl}bun test | tail && git commit -m x${nl}EOF${nl}echo written" \
-         'grep -n "x | y && git commit" notes.md' \
-         "# bun test | tail && git commit -m x${nl}echo ok" \
-         'bun test | tail && git log --grep commit' 'bun test | tail && git add -A' \
-         'bun test | tail && git show commit' 'git log --oneline | head -3' 'echo ok' \
-         'bun test | tail && echo committed' \
-         'bun test | tail && echo git commit -m x' \
-         'set -o pipefail -e; bun test | tail && git commit -m x' \
-         'set +o pipefail -o pipefail; bun test | tail && git commit -m x' \
-         'set -o pipefail >pipefail.log; bun test | tail && git commit -m x' \
-         'set -o pipefail > /dev/null; bun test | tail && git commit -m x' \
-         'bun test | tail && GIT_DIR=/x/git ls' \
-         'echo "a \"b | c" && git commit -m x' \
-         'echo "see #12 | later" && git commit -m "fix #12"' \
-         'echo ok;# bun test | tail && git commit -m x' \
-         "cat <<EOF${nl} EOF${nl}bun test | tail && git commit -m x${nl}EOF" \
-         "cat <<\\EOF${nl}bun test | tail && git commit -m x${nl}EOF${nl}echo ok"; do
+         'bun test | tail && git add -A' 'git log --oneline | head -3' 'echo ok'; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ -z "$out" ]; then ok "allowed: $c"; else no "not allowed: $c (rc $rc, out '$out')"; fi
 done

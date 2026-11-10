@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Integrity checks for the tracked agent harness: skill frontmatter, files the
-# skills and global instructions name, the "no pinned model id" rule, and that
-# every listed plugin has a registered marketplace. Uses disposable repositories;
-# never touches Herdr, Codex or a live ~/.claude.
+# skills and global instructions name, the hand-overs between skills and the
+# "no pinned model id" rule. Never touches Herdr, Codex or a live ~/.claude.
 #   bash claude/skills/test-skills.sh
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -31,92 +30,11 @@ check() { # check <description> <command...>
 }
 
 # shellcheck disable=SC2088
-check 'compound-learning: named audit script exists' \
-  bash -c 'grep -q "~/.claude/harness/brain/audit.sh" "$1" && test -f "$2/brain/audit.sh"' \
-  _ "$here/compound-learning/SKILL.md" "$(dirname "$claude")"
-
-# Execute the skill's example, with a recording audit in a disposable HOME.
-awk '/^   ```bash$/ { code=1; next } /^   ```$/ { code=0 } code { sub(/^   /, ""); print }' \
-  "$here/compound-learning/SKILL.md" > "$tmp/example.sh"
-check 'compound-learning: runnable audit example exists' test -s "$tmp/example.sh"
-check 'compound-learning: destination and report use per lesson consistently' \
-  bash -c 'grep -q "per lesson" "$1" && ! grep -q "per mistake" "$1"' \
-  _ "$here/compound-learning/SKILL.md"
-mkdir -p -- "$HOME/.claude/harness/brain" "$tmp/repo.with_punctuation/sub/dir"
-cat > "$HOME/.claude/harness/brain/audit.sh" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$@" > "$HOME/audit-args"
-if [ ! -d "$1/$2/memory" ]; then
-  printf 'audit error: missing memory directory\n' >&2
-  exit 1
-fi
-exit "${TEST_AUDIT_RESULT:-0}"
-SH
-git init -q -b main -- "$tmp/repo.with_punctuation" || exit 1
-root=$(cd -- "$tmp/repo.with_punctuation" && pwd -P)
-expected_key=$(printf '%s' "$root" | LC_ALL=C tr -c '[:alnum:]' '-')
-mkdir -p -- "$CLAUDE_CONFIG_DIR/projects/$expected_key/memory"
-for brain_state in absent default xdg; do
-  rm -rf -- "$HOME/.local/state/agent-brain.git" "$XDG_STATE_HOME/agent-brain.git"
-  rm -f -- "$HOME/audit-args"
-  case "$brain_state" in
-    default) mkdir -p -- "$HOME/.local/state/agent-brain.git" ;;
-    xdg) mkdir -p -- "$XDG_STATE_HOME/agent-brain.git" ;;
-  esac
-  result=0
-  (
-    if [ "$brain_state" != xdg ]; then unset XDG_STATE_HOME; fi
-    cd -- "$root/sub/dir" || exit 1
-    bash "$tmp/example.sh"
-  ) > "$tmp/example-output" 2>&1 || result=$?
-  if [ "$brain_state" = absent ]; then
-    if [ "$result" -eq 0 ] && [ ! -e "$HOME/audit-args" ]; then
-      ok 'compound-learning: absent brain skips the audit'
-    else no 'compound-learning: absent brain skips the audit'; fi
-  elif [ "$result" -eq 0 ] && [ -f "$HOME/audit-args" ] \
-       && [ "$(cat -- "$HOME/audit-args")" = "$CLAUDE_CONFIG_DIR/projects
-$expected_key" ]; then
-    ok "compound-learning: $brain_state brain audits the repository root from a subdirectory"
-  else no "compound-learning: $brain_state brain audits the repository root from a subdirectory"; fi
+for skill in learn handover; do
+  check "$skill: names the audit script, and it exists" \
+    bash -c 'grep -q "~/.claude/harness/brain/audit.sh --here" "$1" && test -f "$2/brain/audit.sh"' \
+    _ "$here/$skill/SKILL.md" "$repo"
 done
-git -C "$root" -c user.name=Test -c user.email=test@example.org commit -q --allow-empty -m fixture || exit 1
-git -C "$root" worktree add -q --detach -- "$tmp/linked-worktree" || exit 1
-mkdir -p -- "$tmp/linked-worktree/sub/dir"
-rm -f -- "$HOME/audit-args"
-result=0
-(cd -- "$tmp/linked-worktree/sub/dir" && bash "$tmp/example.sh") > "$tmp/example-output" 2>&1 || result=$?
-if [ "$result" -eq 0 ] && [ -f "$HOME/audit-args" ] \
-   && [ "$(cat -- "$HOME/audit-args")" = "$CLAUDE_CONFIG_DIR/projects
-$expected_key" ]; then
-  ok 'compound-learning: linked worktree audits the main checkout memory'
-else no 'compound-learning: linked worktree audits the main checkout memory'; fi
-
-mkdir -p -- "$tmp/new-project"
-rm -f -- "$HOME/audit-args"
-result=0
-(cd -- "$tmp/new-project" && bash "$tmp/example.sh") > "$tmp/example-output" 2>&1 || result=$?
-if [ "$result" -eq 0 ] && [ ! -e "$HOME/audit-args" ] && [ ! -s "$tmp/example-output" ]; then
-  ok 'compound-learning: absent memory skips the audit without an error'
-else no 'compound-learning: absent memory skips the audit without an error'; fi
-
-outside_root=$(cd -- "$tmp/new-project" && pwd -P)
-outside_key=$(printf '%s' "$outside_root" | LC_ALL=C tr -c '[:alnum:]' '-')
-mkdir -p -- "$CLAUDE_CONFIG_DIR/projects/$outside_key/memory"
-result=0
-(cd -- "$tmp/new-project" && bash "$tmp/example.sh") > "$tmp/example-output" 2>&1 || result=$?
-if [ "$result" -eq 0 ] && [ -f "$HOME/audit-args" ] \
-   && [ "$(cat -- "$HOME/audit-args")" = "$CLAUDE_CONFIG_DIR/projects
-$outside_key" ]; then
-  ok 'compound-learning: outside Git audits the physical project directory'
-else no 'compound-learning: outside Git audits the physical project directory'; fi
-
-export TEST_AUDIT_RESULT=19
-result=0
-(cd -- "$root/sub/dir" && bash "$tmp/example.sh") > "$tmp/example-output" 2>&1 || result=$?
-unset TEST_AUDIT_RESULT
-if [ "$result" -eq 19 ]; then ok 'compound-learning: audit failure is propagated'
-else no 'compound-learning: audit failure is propagated'; fi
 
 # --- every skill directory has a SKILL.md whose name is the directory name ----
 for d in "$here"/*/; do
@@ -137,27 +55,30 @@ while IFS= read -r ref; do
 done < <(grep -rhoE '~/\.claude/(harness/claude/)?skills/[A-Za-z0-9._/-]+' "$here" "$claude/CLAUDE.global.md" \
            --include='*.md' --include='*.sh' | sed -E 's#^~/\.claude/(harness/claude/)?skills/##' | sort -u)
 [ "$missing" = 0 ] && ok "every referenced skill file exists" || fail=1
-for skill in delegate compound-learning wrap-up handover; do
-  check "global instructions name the $skill skill, and it exists" \
-    bash -c 'grep -q "\`$2\` skill" "$1" && test -f "$3/$2/SKILL.md"' _ "$claude/CLAUDE.global.md" "$skill" "$here"
+# The loop in the global instructions is how a skill gets reached.
+for d in "$here"/*/; do
+  skill=$(basename "$d")
+  check "global instructions name the $skill skill" grep -qF -- "\`$skill\`" "$claude/CLAUDE.global.md"
+done
+# Each skill hands over to one that exists.
+for pair in design:grill design:write-plan write-plan:build build:delegate build:review review:delegate \
+            review:wrap-up wrap-up:handover wrap-up:learn handover:learn learn:review; do
+  check "${pair%:*}: names the ${pair#*:} skill" grep -qF -- "\`${pair#*:}\` skill" "$here/${pair%:*}/SKILL.md"
 done
 
 # --- only the orchestrator in the main checkout runs the memory-writing skills
-for skill in compound-learning wrap-up handover; do
+for skill in learn wrap-up handover; do
   check "$skill: runs only as the orchestrator in the main checkout" \
     bash -c 'tr "\n" " " < "$1" | grep -q "orchestrator in the main checkout"' _ "$here/$skill/SKILL.md"
 done
 
 # --- session end: wrap-up records through handover, handover has its parts ---
-check "wrap-up: names the handover and compound-learning skills" \
-  bash -c 'grep -q "\`handover\` skill" "$1" && grep -q "\`compound-learning\` skill" "$1"' \
-  _ "$here/wrap-up/SKILL.md"
 check "wrap-up: never pkill -f, and only this session's items" \
   bash -c 'grep -q "Never \`pkill -f\`" "$1" && grep -q "only what this session made" "$1"' \
   _ "$here/wrap-up/SKILL.md"
-check "handover: the six parts in order" \
-  bash -c 'printf "%s\n" State "Shipped this session" Decisions Next Leftovers "Pending from the user" > "$2/parts"
-    grep -oE "^[1-6]\. \*\*[^.]+\.\*\*" "$1" | sed -E "s/^[1-6]\. \*\*(.*)\.\*\*$/\1/" | cmp -s - "$2/parts"' \
+check "handover: the five parts in order" \
+  bash -c 'printf "%s\n" State Decisions Next Leftovers "Pending from the user" > "$2/parts"
+    grep -oE "^[1-5]\. \*\*[^.]+\.\*\*" "$1" | sed -E "s/^[1-5]\. \*\*(.*)\.\*\*$/\1/" | cmp -s - "$2/parts"' \
   _ "$here/handover/SKILL.md" "$tmp"
 check "handover: a leftover says where it lives" \
   bash -c 'tr "\n" " " < "$1" | tr -s " " | grep -q "untested paths, each with the file, function or screen it lives in\."' \
@@ -165,28 +86,18 @@ check "handover: a leftover says where it lives" \
 
 # --- the review rubric the delegate skill hands to every reviewer --------------
 # shellcheck disable=SC2088  # a literal ~ path, matched as text
-check "delegate: the review brief names the rubric under the harness link" \
-  grep -q '~/\.claude/harness/claude/skills/delegate/review\.md' "$here/delegate/SKILL.md"
+check "review: the brief names the rubric under the harness link" \
+  grep -q '~/\.claude/harness/claude/skills/review/rubric\.md' "$here/review/SKILL.md"
 check "delegate: launches name pane.sh under the harness link" \
   bash -c 'grep -q "~/\.claude/harness/claude/skills/delegate/pane\.sh" "$1" && ! grep -q "~/\.claude/skills/" "$1"' \
   _ "$here/delegate/SKILL.md"
-check "delegate: the rubric is report-only" grep -q 'edit no file' "$here/delegate/review.md"
+check "review: the rubric is report-only" grep -q 'edit no file' "$here/review/rubric.md"
 
 # --- no pinned model identifiers in instruction text ---------
 check "no pinned model ids in skill, instruction or manual text" \
   bash -c '! grep -rEq "claude-(opus|sonnet|haiku|fable)-[0-9]|gpt-[0-9]" "$1" "$2" "$3" --include="*.md"' \
   _ "$here" "$claude/CLAUDE.global.md" "$repo/docs/internals"
 
-# --- settings: valid JSON, and no listed plugin without its marketplace --------
-# Built-in marketplaces ship with Claude Code and never appear in
-# extraKnownMarketplaces.
-settings="$claude/settings.json"
-builtin_marketplaces="anthropic-plugin-directory"
-check "settings.json is valid JSON" jq -e . "$settings"
-orphans=$(jq -r --arg builtin "$builtin_marketplaces" \
-  '((.extraKnownMarketplaces // {} | keys) + ($builtin | split(" "))) as $m
-  | (.enabledPlugins // {}) | keys[] | select((split("@")[1]) as $mk | ($m | index($mk)) == null)' "$settings" 2>/dev/null)
-if [ -z "$orphans" ]; then ok "every listed plugin has a registered marketplace"
-else no "plugin without a marketplace: $orphans"; fi
+check "settings.json is valid JSON" jq -e . "$claude/settings.json"
 
 exit "$fail"

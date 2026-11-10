@@ -14,9 +14,6 @@
       "Read(~/.local/share/vdirsyncer/**)"
     ]
   },
-  "enabledPlugins": {
-    "superpowers@anthropic-plugin-directory": true
-  },
   "attribution": {
     "commit": "",
     "pr": ""

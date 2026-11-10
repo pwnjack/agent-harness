@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
-# Check memory index links, secret-shaped text and the index size, read-only.
+# Check memory index links, secret-shaped text, file sizes and cited home
+# paths, read-only.
+#   audit.sh <projects-dir> [project-key...]
+#   audit.sh --here    this checkout's memory; silent without a brain or memory
 set -euo pipefail
 export LC_ALL=C
 
+if [ "${1:-}" = --here ]; then
+  [ -d "${XDG_STATE_HOME:-$HOME/.local/state}/agent-brain.git" ] || exit 0
+  # Subdirectories and linked worktrees share the main checkout's memory.
+  root=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p') || root=
+  [ -n "$root" ] || root=$(pwd -P)
+  set -- "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" "$(printf '%s' "$root" | tr -c '[:alnum:]' '-')"
+  [ -d "$1/$2/memory" ] || exit 0
+fi
 if [ "$#" -lt 1 ]; then
-  printf 'usage: audit.sh <projects-dir> [project-key...]\n' >&2
+  printf 'usage: audit.sh <projects-dir> [project-key...] | --here\n' >&2
   exit 2
 fi
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -110,6 +121,14 @@ audit_project() {
     # One fact per file: a file this large has become a grab-bag to split.
     if [ -r "$file" ] && [ "$(wc -c < "$file")" -gt 8192 ]; then
       printf 'WARN %s/memory/%s: over 8192 bytes\n' "$key" "$path"
+    fi
+    # A memory citing a home path that is gone has outlived what it describes.
+    # Only a whole backticked `~/path` counts: no spaces, placeholders or globs.
+    if [ -r "$file" ]; then
+      { grep -oE '`~/[^`[:space:]<>*$]+`' -- "$file" 2>/dev/null || true; } | tr -d '`' | sort -u > "$tmp/cited"
+      while IFS= read -r cited; do
+        [ -e "$HOME/${cited#\~/}" ] || printf 'WARN %s/memory/%s: cites missing %s\n' "$key" "$path" "$cited"
+      done < "$tmp/cited"
     fi
   done < "$tmp/files"
 }
