@@ -76,6 +76,9 @@ done
 check "wrap-up: never pkill -f, and only this session's items" \
   bash -c 'grep -q "Never \`pkill -f\`" "$1" && grep -q "only what this session made" "$1"' \
   _ "$here/wrap-up/SKILL.md"
+check "wrap-up: deletes only branches this session created" \
+  bash -c 'grep -q "only branches this session created" "$1" && tr "\n" " " < "$1" | tr -s " " | grep -q "each merged branch it created"' \
+  _ "$here/wrap-up/SKILL.md"
 check "handover: the five parts in order" \
   bash -c 'printf "%s\n" State Decisions Next Leftovers "Pending from the user" > "$2/parts"
     grep -oE "^[1-5]\. \*\*[^.]+\.\*\*" "$1" | sed -E "s/^[1-5]\. \*\*(.*)\.\*\*$/\1/" | cmp -s - "$2/parts"' \

@@ -369,6 +369,8 @@ if [ "$result" -eq 1 ] && [ "$(head_oid)" = "$before" ] \
    && ! grep -Fq -- "$secret" "$case_dir/stderr"; then ok 'secret: no commit and value absent from stderr'
 else no 'secret: no commit and value absent from stderr'; fi
 
+# Split so GitHub push protection does not take the Stripe fixtures for real keys.
+live=live
 while IFS=$'\t' read -r name secret; do
   fixture
   printf '%s\n' "$secret" >> "$memory/note.md"
@@ -378,7 +380,7 @@ while IFS=$'\t' read -r name secret; do
      && ! grep -Fq -- "$secret" "$case_dir/stderr"; then
     ok "secret ($name): unborn commit refused without exposing value"
   else no "secret ($name): unborn commit refused without exposing value"; fi
-done <<'SECRETS'
+done <<SECRETS
 anthropic	sk-ant-abcdefghijklmnopqrstuvwxyz012345
 github	ghp_abcdefghijklmnopqrstuvwxyz012345
 github-pat	github_pat_abcdefghijklmnopqrstuvwxyz012345
@@ -386,6 +388,10 @@ google	AIzaabcdefghijklmnopqrstuvwxyz012345678
 aws	AKIAABCDEFGHIJKLMNOP
 slack	xoxb-abcdefghijklmnop
 private-key	-----BEGIN RSA PRIVATE KEY-----
+stripe	sk_${live}_abcdefghijklmnopqrstuvwx
+gitlab	glpat-abcdefghijklmnopqrst
+huggingface	hf_abcdefghijklmnopqrstuvwxyz0123
+npm	npm_abcdefghijklmnopqrstuvwxyz0123456789
 assignment	SERVICE_TOKEN = 'abcdefghijklmnop012345'
 SECRETS
 

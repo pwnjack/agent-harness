@@ -29,7 +29,7 @@ instead. Nothing is pushed or merged that the user has not asked for.
    | Scratchpad and mockup files | the session's scratchpad directory and any mockup directory it served |
    | Servers and local stacks | `ss -ltnp` for listeners; the launch output for PIDs |
    | Worktrees | `git worktree list` |
-   | Branches | `git branch --merged <main>` locally; `git branch -r --merged <main>` on origin |
+   | Branches | `git branch --merged <main>` locally; `git branch -r --merged <main>` on origin; only branches this session created |
 
 3. **Clean up**, only what this session made:
    - Panes: `herdr pane close <pane>` for finished worker panes. Another
@@ -44,10 +44,10 @@ instead. Nothing is pushed or merged that the user has not asked for.
      --ignored` there (a copy of an environment file or any other file this
      session put there goes with the worktree; a unique uncommitted change
      stays, with the worktree, and is listed under pending); `git worktree
-     remove` it; then `git branch -d` each merged branch, `git push origin
-     --delete` its remote copy, and `git remote prune origin`. A branch
-     still checked out in a worktree cannot be deleted, which is why the
-     worktree goes first. Unmerged branches, other people's branches and
+     remove` it; then `git branch -d` each merged branch it created, `git
+     push origin --delete` its remote copy, and `git remote prune origin`. A
+     branch still checked out in a worktree cannot be deleted, which is why
+     the worktree goes first. Unmerged branches, other people's branches and
      stashes you did not create stay.
    - An item that stays gets a reason in the report: a gitignored mockup a
      spec refers to, a worktree the user asked to keep, a stack with data.
