@@ -77,6 +77,8 @@ if [ "$result" -eq 1 ] && exact 'ERROR -home-u-proj/memory/missing.md: missing f
 else no 'index entry without file: ERROR names it'; fi
 
 # Keep expectations independent of the patterns file so a missing rule fails.
+# Split so GitHub push protection does not take the Stripe fixtures for real keys.
+live=live
 while IFS=$'\t' read -r name value; do
   fixture
   printf '%s\n' "$value" >> "$memory/note.md"
@@ -86,7 +88,7 @@ while IFS=$'\t' read -r name value; do
      && ! grep -Fq -- "$value" "$tmp/output"; then
     ok "secret ($name): detected without exposing value"
   else no "secret ($name): detected without exposing value"; fi
-done <<'SECRETS'
+done <<SECRETS
 openai	sk-abcdefghijklmnopqrstuvwxyz012345
 anthropic	sk-ant-abcdefghijklmnopqrstuvwxyz012345
 github	ghp_abcdefghijklmnopqrstuvwxyz012345
@@ -98,6 +100,11 @@ slack	xoxb-abcdefghijklmnop
 slack	xoxa-abcdefghijklmnop
 slack	xoxp-abcdefghijklmnop
 private-key	-----BEGIN RSA PRIVATE KEY-----
+stripe	sk_${live}_abcdefghijklmnopqrstuvwx
+stripe	rk_${live}_abcdefghijklmnopqrstuvwx
+gitlab	glpat-abcdefghijklmnopqrst
+huggingface	hf_abcdefghijklmnopqrstuvwxyz0123
+npm	npm_abcdefghijklmnopqrstuvwxyz0123456789
 assignment	SERVICE_TOKEN = 'abcdefghijklmnop012345'
 SECRETS
 

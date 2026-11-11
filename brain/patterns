@@ -6,4 +6,8 @@ google	AIza[0-9A-Za-z_-]{35}
 aws	AKIA[0-9A-Z]{16}
 slack	xox[bap]-[A-Za-z0-9-]{10,}
 private-key	-----BEGIN [A-Z ]*PRIVATE KEY-----
+stripe	[rs]k_live_[A-Za-z0-9]{20,}
+gitlab	glpat-[A-Za-z0-9_-]{20,}
+huggingface	hf_[A-Za-z0-9]{30,}
+npm	npm_[A-Za-z0-9]{36}
 assignment	[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*["']?[A-Za-z0-9_/+.=-]{16,}
