@@ -43,6 +43,9 @@ Workers share none of this conversation. Write the brief to
 ## Verification  exact commands and expected output
 ```
 
+A read-only `explore` brief needs only the first line, the question and
+where to look.
+
 A worker leaves its changes uncommitted; you commit after checking them.
 Codex's sandbox blocks some sockets and the network: install dependencies and
 fetch data first, name any check that cannot pass in the sandbox, and run
