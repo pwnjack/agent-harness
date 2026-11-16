@@ -25,7 +25,7 @@ instead. Nothing is pushed or merged that the user has not asked for.
    | Category | How to look |
    |---|---|
    | Worker panes | `herdr pane list`; only panes this session started (the names from `pane.sh`) |
-   | Briefs and reports | `ls /tmp/delegate`; only this session's files |
+   | Briefs and reports | `command ls /tmp/delegate`; only this session's files |
    | Scratchpad and mockup files | the session's scratchpad directory and any mockup directory it served |
    | Servers and local stacks | `ss -ltnp` for listeners; the launch output for PIDs |
    | Worktrees | `git worktree list` |
