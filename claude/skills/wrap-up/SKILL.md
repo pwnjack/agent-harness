@@ -63,14 +63,3 @@ instead. Nothing is pushed or merged that the user has not asked for.
 7. **Report** in three parts: removed, kept and why, pending (for the user
    or the next session). Nothing in the pending part is a cleanup you could
    have done.
-
-## Red flags
-
-| Thought | Reality |
-|---|---|
-| "I'll report the state and suggest the deletions" | The user asked for a finished state. Suggesting hands the cleanup back; do it and report what went. |
-| "The branch is merged, so the worktree can go unchecked" | Look first: a worktree can hold a unique uncommitted change, which stays, beside a copied environment file, which goes. |
-| "`pkill -f` is quicker" | It kills its own shell. PID first, then `kill`. |
-| "That pane looks finished, close it" | Only panes this session started. |
-| "The handover can wait for next time" | Without it the next session re-derives everything. Write it now. |
-| "Memory says finalized, no need to show output" | Confirmation is command output, not a sentence. |
