@@ -2,6 +2,8 @@
 
 This repository is a public manual for the agent: it describes what exists and
 how to use it. Decisions, lessons, traps and history go to memory, never here.
+The lazy rules of `claude/CLAUDE.global.md` apply here harder than anywhere:
+tighten or delete a line before adding one.
 Before changing a part, read its file in `docs/internals/`: `setup.md`
 (wiring, settings, removal), `brain.md` (memory repository, learning skill),
 `delegation.md` (panes, models, advisor), `session.md` (the loop, wrap-up and

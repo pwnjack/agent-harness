@@ -65,6 +65,46 @@ for pair in design:grill design:write-plan write-plan:build build:delegate build
             review:wrap-up wrap-up:handover wrap-up:learn handover:learn learn:review; do
   check "${pair%:*}: names the ${pair#*:} skill" grep -qF -- "\`${pair#*:}\` skill" "$here/${pair%:*}/SKILL.md"
 done
+# --- one entry rule: the global instructions route work to the lightest step
+# that fits, each skill repeats its side, and wrap-up stays outside the loop --
+# says <file> <text>: the file holds the text, line breaks and space runs aside
+says() { tr '\n' ' ' < "$1" | tr -s ' ' | grep -qF -- "$2"; }
+g=$claude/CLAUDE.global.md
+check "loop: work enters at the first entry that fits, lightest first" \
+  says "$g" 'Work enters at the first of these that fits; each skill ends by naming the next. - Trivial (a one-line fix, a rename, a config tweak): no loop. Do it, verify it. - Small (a bug fix, a contained change): `build`. - Decided, but more than three lines of scope: `write-plan`. - Anything else (more than one sound approach, real rework if you guess wrong): `design`.'
+check "loop: its last step is review" \
+  grep -qxF -- '`design` (brainstorm, `grill`, spec) → `write-plan` → `build` → `review`' "$g"
+check "loop: wrap-up closes a session, not a change" \
+  says "$g" 'run the `wrap-up` skill: it closes a session, not a change'
+check "design: its description claims only an open, costly approach" \
+  bash -c 'sed -n 3p "$1" | grep -qF "more than one sound approach, would cost real rework if guessed wrong, and has no spec yet" \
+    && ! sed -n 3p "$1" | grep -qF "build X"' _ "$here/design/SKILL.md"
+check "design: sends a decided change on" \
+  says "$here/design/SKILL.md" 'A change that is already decided needs no spec'
+check "write-plan: plans a decided change that has no spec" \
+  says "$here/write-plan/SKILL.md" 'No spec, because nothing was left to design: write the plan alone'
+check "write-plan: sends a three-line scope to build" \
+  says "$here/write-plan/SKILL.md" 'A scope that fits in three lines needs no plan: the `build` skill.'
+check "build: a three-line scope is the plan and the acceptance" \
+  says "$here/build/SKILL.md" 'the request is the plan when its scope fits in three lines: say them (what changes, where, how it is checked) and start. They stand in for the plan and for the spec'
+check "build: an unknown cause is found first" \
+  says "$here/build/SKILL.md" 'A bug whose cause is not known: find the cause before the three lines.'
+check "build: an open detail is named, and asked only when it cannot be undone" \
+  says "$here/build/SKILL.md" 'take the smallest reading and name it in those lines. Ask first only when a wrong guess cannot be undone.'
+check "build: sends bigger or undecided work back" \
+  says "$here/build/SKILL.md" 'More than three lines: the `write-plan` skill first. More than one sound approach and real rework if you guess wrong: the `design` skill first.'
+check "build: does not hand over to wrap-up" \
+  says "$here/build/SKILL.md" 'or the next change. The `wrap-up` skill waits for the session'
+check "review: does not hand over to wrap-up inside a session" \
+  says "$here/review/SKILL.md" 'or the next change. At the session'
+check "review: the brief carries the scope lines when there is no file" \
+  says "$here/review/SKILL.md" 'with no file, the three scope lines from the `build` skill, written out'
+check "global: the skipped-and-risk footer ends reports of work or findings" \
+  says "$g" 'End a report of work or findings with one or two lines'
+check "wrap-up: a session that made nothing skips inventory, cleanup and confirmation" \
+  says "$here/wrap-up/SKILL.md" 'A session that changed nothing and started nothing (no edit, commit, pane, server, worktree or branch) skips steps 2 to 4. A resumed or compacted session cannot know that, and skips none.'
+check "delegate: an explore brief is the first line and the question" \
+  says "$here/delegate/SKILL.md" 'A read-only `explore` brief needs only the first line, the question and where to look.'
 
 # --- only the orchestrator in the main checkout runs the memory-writing skills
 for skill in learn wrap-up handover; do
