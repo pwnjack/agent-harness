@@ -29,7 +29,8 @@ work, `sonnet` for yours or Opus's); say the review was same-family.
 
 ## The brief
 
-The goal, the acceptance criteria (the spec or plan path), what to review as
+The goal, the acceptance criteria (the spec or plan path; with no file, the
+three scope lines from the `build` skill, written out), what to review as
 above, and this line. Never the implementer's report or test claims.
 
 > Read `~/.claude/harness/claude/skills/review/rubric.md` and follow it.
@@ -61,5 +62,5 @@ When the user asks for a lean or simplify review of existing code, send the
 same rubric as task `lean` or `lean-<area>`, name the files or folders and
 "lean review" in the brief, and fix nothing until the user picks.
 
-Next, inside the loop: the `wrap-up` skill, or back to `build` for what the
-user picked.
+Next: back to `build` for what the user picked, else the user's merge
+decision or the next change. At the session's end: the `wrap-up` skill.

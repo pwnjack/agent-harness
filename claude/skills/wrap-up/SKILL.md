@@ -14,6 +14,10 @@ instead. Nothing is pushed or merged that the user has not asked for.
 
 ## Steps, in order
 
+A session that changed nothing and started nothing (no edit, commit, pane,
+server, worktree or branch) skips steps 2 to 4. A resumed or compacted
+session cannot know that, and skips none.
+
 1. **Verify the final state.** `git status --short` shows what is
    uncommitted; `git log --oneline @{upstream}..` shows what is unpushed.
    Re-run the project's checks only if the tree changed since they last

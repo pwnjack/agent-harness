@@ -1,6 +1,6 @@
 ---
 name: design
-description: Turn an idea into an approved spec - brainstorm it, grill the user on it, write it down. Use for "let's build X", "I have an idea", "brainstorm", "spec this", /design, and before a feature or behaviour change with open design questions and no spec yet.
+description: Turn an idea into an approved spec - brainstorm it, grill the user on it, write it down. Use for "I have an idea", "brainstorm", "spec this", /design, and before a change that has more than one sound approach, would cost real rework if guessed wrong, and has no spec yet.
 ---
 
 # Design
@@ -8,6 +8,8 @@ description: Turn an idea into an approved spec - brainstorm it, grill the user 
 From an idea to a spec the user has approved. Nothing is implemented here.
 The spec is one file, `docs/specs/<slug>.md`, unless the project's
 instructions name another place; the plan is later appended to the same file.
+A change that is already decided needs no spec: it starts at the `write-plan`
+skill, or at `build` when its scope fits in three lines.
 
 ## 1. Brainstorm
 

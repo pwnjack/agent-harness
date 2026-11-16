@@ -1,13 +1,20 @@
 ---
 name: build
-description: Implement an approved plan task by task, directly or through workers, then review the whole change and fix what the review finds. Use for "build it", "implement the plan", "go", /build, and after the write-plan skill's plan is approved.
+description: Implement a decided change, an approved plan task by task or a small change straight from the request, directly or through workers, then review the whole change and fix what the review finds. Use for "build it", "implement the plan", "go", /build, after the write-plan skill's plan is approved, and for a small change or a bug fix that needs no plan.
 ---
 
 # Build
 
-From an approved plan to a reviewed branch. No plan and the change is small
-and clear: the request is the plan; say its scope in three lines and start.
-No plan and it is not small: the `write-plan` skill first.
+From a decided change to a reviewed branch. With a plan, follow it. With
+none, the request is the plan when its scope fits in three lines: say them
+(what changes, where, how it is checked) and start. They stand in for the
+plan and for the spec's Acceptance below.
+
+- A bug whose cause is not known: find the cause before the three lines.
+- A detail the request leaves open: take the smallest reading and name it in
+  those lines. Ask first only when a wrong guess cannot be undone.
+- More than three lines: the `write-plan` skill first. More than one sound
+  approach and real rework if you guess wrong: the `design` skill first.
 
 ## 1. Branch
 
@@ -39,11 +46,12 @@ stop, fix the plan with the user, then go on. Never improvise past it.
 1. Run the project's full checks.
 2. Walk the spec's Acceptance lines: each one is shown true by a command or
    by looking at the running thing, not by the diff.
-3. Run the `review` skill on the branch against the spec and plan. It fixes
-   what holds and reports the rest.
+3. Run the `review` skill on the branch against the spec and plan, or your
+   three lines. It fixes what holds and reports the rest.
 
 ## 4. Report
 
 What was built, per Acceptance line; what the review found and what was
-fixed; what the user must still check by hand. Next: the `wrap-up` skill, or
-the user's merge decision.
+fixed; what the user must still check by hand. Next: the user's merge
+decision, or the next change. The `wrap-up` skill waits for the session's
+end.

@@ -1,14 +1,16 @@
 ---
 name: write-plan
-description: Turn an approved spec into an ordered list of small, checkable tasks. Use for "write the plan", "plan this", "break this down", /write-plan, and after the design skill's spec is approved.
+description: Turn an approved spec, or a decided change too big to say in three lines, into an ordered list of small, checkable tasks. Use for "write the plan", "plan this", "break this down", /write-plan, and after the design skill's spec is approved.
 ---
 
 # Write plan
 
-From an approved spec to tasks someone with none of this conversation could
+From a decided change to tasks someone with none of this conversation could
 carry out. The plan is appended to the spec's file under `## Plan`, so the
-reviewer reads one file. No spec and the change is small and clear: write the
-plan alone, with a two-line goal on top.
+reviewer reads one file. No spec, because nothing was left to design: write
+the plan alone in `docs/specs/<slug>.md`, or where the project keeps its
+specs, under a two-line goal that stands in for the spec below. A scope that
+fits in three lines needs no plan: the `build` skill.
 
 ## 1. Scope
 
