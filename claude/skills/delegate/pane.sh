@@ -17,8 +17,8 @@
 # Role: impl|review|explore|fix. Task: one or two a-z0-9- words naming the
 # work, shared by an implementer and its reviewer. The pane is named
 # <role>-<model>-<task> (the alias, or "codex" for config.toml's model) so the
-# sidebar reads at a glance; the task must not repeat a role, a family or the
-# alias, and the name must fit Herdr's 32 characters.
+# sidebar reads at a glance; the task must not open with this launch's role,
+# a family or the alias, and the name must fit Herdr's 32 characters.
 #
 # First stdout line: <VERDICT> pane=... report=... elapsed=...[ kept]
 # " kept" ends it whenever the pane is left open.
@@ -221,7 +221,7 @@ else
   case "$alias" in *[!a-z]*|'') usage ;; esac
   [[ $role =~ ^($ROLES)$ ]] || { echo "role must be $ROLES (got '$role')" >&2; exit 2; }
   [[ $task =~ ^[a-z0-9]+(-[a-z0-9]+)?$ ]] || { echo "task must be one or two a-z0-9 words joined by '-' (got '$task')" >&2; exit 2; }
-  [[ ! $task =~ ^($ROLES|dlg|claude|codex|$alias)(-|$) ]] || {
+  [[ ! $task =~ ^($role|dlg|claude|codex|$alias)(-|$) ]] || {
     echo "task '$task' repeats what the name already says; name the work" >&2; exit 2; }
   [ -r "$brief" ] || { echo "brief not readable: $brief" >&2; exit 2; }
 fi

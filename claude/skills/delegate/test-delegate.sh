@@ -127,9 +127,11 @@ check "$(gate codex sol high impl "$(task 23)" "$b")"   8 "a name of exactly 32 
 check "$(gate claude sonnet high impl "$(task 21)" "$b")" 2 "claude name over Herdr's 32 characters"
 check "$(gate codex sol high bogus slug "$b")"          2 "unknown role"
 check "$(gate codex sol high review "$b")"              2 "role without a task"
-for t in dlg-x impl-x review codex-x claude sol-x -x x- x--y x-y-z; do
+for t in dlg-x review-x review codex-x claude sol-x -x x- x--y x-y-z; do
   check "$(gate codex sol high review "$t" "$b")"       2 "task '$t' repeats the name or is malformed"
 done
+check "$(gate codex sol high impl fix-login "$b")"      8 "a task may open with another role's word"
+check "$(gate codex sol high fix fix-login "$b")"       2 "a task that opens with its own role"
 check "$(gate codex sol high review solar "$b")"        8 "a task that merely starts like the alias"
 check "$(gate claude sonnet medium impl slug "$b")"    8 "valid claude, no herdr"
 check "$(gate claude haiku high impl slug "$b")"       8 "claude haiku, no herdr"
