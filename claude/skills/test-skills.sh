@@ -65,6 +65,13 @@ for pair in design:grill design:write-plan write-plan:build build:delegate build
             review:wrap-up wrap-up:handover wrap-up:learn handover:learn learn:review; do
   check "${pair%:*}: names the ${pair#*:} skill" grep -qF -- "\`${pair#*:}\` skill" "$here/${pair%:*}/SKILL.md"
 done
+check "loop: small and clear work starts at build, not design" \
+  bash -c 'tr "\n" " " < "$1" | tr -s " " | grep -q "Small and clear work (a bug with a known cause, a contained change) starts at \`build\`" \
+    && ! grep -q "alters behaviour and has no spec" "$2"' \
+  _ "$claude/CLAUDE.global.md" "$here/design/SKILL.md"
+check "global: the skipped-and-risk footer is for work reports only" \
+  bash -c 'tr "\n" " " < "$1" | tr -s " " | grep -q "When you report work, end with one or two lines"' \
+  _ "$claude/CLAUDE.global.md"
 
 # --- only the orchestrator in the main checkout runs the memory-writing skills
 for skill in learn wrap-up handover; do

@@ -1,6 +1,6 @@
 ---
 name: design
-description: Turn an idea into an approved spec - brainstorm it, grill the user on it, write it down. Use for "let's build X", "I have an idea", "brainstorm", "spec this", /design, and before any change that adds a feature or alters behaviour and has no spec yet.
+description: Turn an idea into an approved spec - brainstorm it, grill the user on it, write it down. Use for "let's build X", "I have an idea", "brainstorm", "spec this", /design, and before a feature or behaviour change with open design questions and no spec yet.
 ---
 
 # Design

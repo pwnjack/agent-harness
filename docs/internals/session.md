@@ -7,6 +7,7 @@
   global instructions name the loop; each skill ends by naming the next, and
   `test-skills.sh` checks both. Every skill runs for the user (`/name`) and
   for the agent alike. `delegate` is the manual for handing work to a pane.
+  Trivial work skips the loop; small and clear work starts at `build`.
 - **One file per piece of work.** `design` writes the spec to
   `docs/specs/<slug>.md`, `write-plan` appends the plan to it, and `review`
   hands that one path to the reviewer.
