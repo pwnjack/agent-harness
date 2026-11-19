@@ -42,7 +42,8 @@ session cannot know that, and skips none.
      local stack with its own stop command. Never `pkill -f` a pattern: it
      matches the shell running it and the rest of the command never runs.
    - Files: remove this session's briefs, reports, scratchpad files and
-     mockup directories.
+     mockup directories, in a call of their own: a refused removal takes the
+     rest of its command with it.
    - Git, in this order: switch the main checkout to the main branch;
      inspect each worktree of this session with `git status --short
      --ignored` there (a copy of an environment file or any other file this

@@ -28,7 +28,8 @@ What to attack, in this order:
    assuming it must also do?
 4. Who loses data, access or a working feature if it goes wrong?
 5. The edges: empty, first use, the thousandth item, two people at once, a
-   failure half way, no network, the wrong role.
+   failure half way, no network, the wrong role, a saved copy (every input
+   it is keyed by, everything its reader needs).
 6. How will anyone know it works, and know when it stops working?
 
 Stop when no open question would change the design. End with the list:
