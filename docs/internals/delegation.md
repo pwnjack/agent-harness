@@ -77,9 +77,9 @@ alone.
 - `--wait` and `--resume` keep the pane on REPORT; `DELEGATE_KEEP=0` makes
   `--wait` close it. QUOTA always closes it. Whenever a pane is left open, the
   verdict line ends in ` kept`.
-- A start that fails on a first-run folder-trust prompt is BLOCKED with the
-  pane kept and its own `next:` line: the brief was never sent, so the launch
-  is rerun after the prompt is answered.
+- A start that fails on a first-run folder-trust prompt or on Codex's update
+  menu is BLOCKED with the pane kept and its own `next:` line: the brief was
+  never sent, so the launch is rerun after the prompt is answered.
 - A block in the first seconds of a resumed `--wait` is not reported.
 - A Claude worker idle while its own background work runs is not finished:
   while the last four lines of text show Claude Code's footer count

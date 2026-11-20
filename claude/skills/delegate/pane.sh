@@ -303,6 +303,10 @@ if [ -n "$kind" ]; then
       next="first-run folder trust prompt: answer it in $pane, then herdr pane close $pane and rerun the launch (the brief was not sent)"
       finish BLOCKED 3
     fi
+    if screen | grep -qi 'update available'; then
+      next="Codex's update menu: herdr pane send-keys $pane 3 skips this version (updating is the user's call), then herdr pane close $pane and rerun the launch (the brief was not sent)"
+      finish BLOCKED 3
+    fi
     finish NOSTART 7 close
   fi
   if screen | grep -qiE 'do you trust|trust this (folder|directory)|sign in|log ?in to|press enter to continue'; then
