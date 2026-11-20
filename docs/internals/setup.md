@@ -10,7 +10,8 @@
 | `claude/hooks/agent-guard.sh` | named in the settings | run in place |
 | `claude/hooks/pkill-guard.sh` | named in the settings | run in place on every Bash call |
 | `claude/hooks/commit-pipe-guard.sh` | named in the settings | run in place on every Bash call |
-| `claude/hooks/command-text.sh` | sourced by the two Bash guards beside themselves | read in place |
+| `claude/hooks/git-patch-guard.sh` | named in the settings | run in place on every Bash call |
+| `claude/hooks/command-text.sh` | sourced by the Bash guards beside themselves | read in place |
 | `claude/hooks/advisor-reset.sh` | named in the settings | run in place at non-worker startup |
 | `claude/settings.json` | `~/.claude/settings.json` | merged by `claude/apply-settings.sh` |
 | `claude/statusline.sh` | named in the settings | run in place |

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Sourced by the Bash guards (pkill-guard.sh, commit-pipe-guard.sh). Reads the
+# Sourced by the Bash guards (pkill-guard.sh, commit-pipe-guard.sh,
+# git-patch-guard.sh). Reads the
 # PreToolUse JSON on stdin and sets `text` to the command with heredoc bodies
 # dropped and backslash-newlines joined. Without a command string it exits 0,
 # so the hook that sources it stays silent.
