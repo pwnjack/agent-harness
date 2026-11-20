@@ -25,11 +25,13 @@ no() { echo "FAIL $1"; fail=1; }
 run() { jq -n --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}' | bash "$here/git-patch-guard.sh" 2>&1; }
 
 nl=$'\n'
+tab=$'\t'
 for c in 'git add -p' 'git checkout -p file.sh' 'git checkout -q -p file.sh </dev/null' 'git restore --patch .' \
          'git reset -p HEAD~1' 'git commit -p -m "msg"' 'git stash -p' 'git stash push -p' 'git add -up' \
          'git -C /repo checkout -p' 'git --no-pager -c core.editor=true restore -p x' '/usr/bin/git add -p' \
          'sed -i s/a/b/ f && git checkout -p f; ./test.sh' "echo one${nl}GIT_PAGER=cat git restore -p x" \
-         'out=$(git add -p)' 'git restore --source=HEAD~1 -p file'; do
+         'out=$(git add -p)' 'git restore --source=HEAD~1 -p file' 'if git add -p; then :; fi' 'sudo git add -p' \
+         'FOO="a b" BAR=1 git add -p' 'time git checkout -p f' 'git status # see below'"${nl}"'git add -p'; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ "$(jq -r .hookSpecificOutput.permissionDecision <<<"$out" 2>/dev/null)" = deny ]
   then ok "refused: $c"; else no "not refused: $c (rc $rc, out '$out')"; fi
@@ -42,7 +44,10 @@ for c in 'git log -p' 'git show -p HEAD' 'git diff -p --stat' 'git stash show -p
          'git commit -m "explain -p handling"' "git commit -m 'git add -p is refused'" 'git checkout --progress x' \
          'git add --pathspec-from-file=list' 'git push -u origin topic' 'git --no-pager log -p add' \
          'git -C /repo log -p' 'git add file # then -p by hand' 'mygit add -p' 'git commit -F msg > log-p' \
-         "git commit -F - <<'MSG'${nl}git add -p is refused${nl}MSG" 'pacman -Q git; grep -p x'; do
+         "git commit -F - <<'MSG'${nl}git add -p is refused${nl}MSG" 'pacman -Q git; grep -p x' \
+         'git --no-pager log --grep add -p -n 1 --oneline' 'echo git add -p' "printf '%s\\n' git add -p" \
+         'git status # note | git add -p' 'git status # later; git checkout -p x' "git add${tab}--${tab}-p" \
+         'git -p log' 'git -c color.ui=never log -p -- add'; do
   out=$(run "$c"); rc=$?
   if [ "$rc" = 0 ] && [ -z "$out" ]; then ok "allowed: $c"; else no "not allowed: $c (rc $rc, out '$out')"; fi
 done

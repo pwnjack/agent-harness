@@ -219,7 +219,7 @@ case "$1 $2" in
                 case "$SCEN" in
                   trustblock) echo "Trust this folder? Codex can read, edit, and run files here" > "$S/screen"; exit 1 ;;
                   updatemenu) printf 'Update available · 0.1.0 → 0.2.0\n› 1. Update now\n  3. Skip until next version\n' > "$S/screen"; exit 1 ;;
-                  startfail) echo "error: agent crashed" > "$S/screen"; exit 1 ;;
+                  startfail) echo "error: agent crashed (no update available)" > "$S/screen"; exit 1 ;;
                 esac; exit 0 ;;
   "agent read") cat "$S/screen" 2>/dev/null ;;
   "agent send-keys") echo "$4" >> "$S/keys"; : > "$S/screen" ;;
@@ -607,6 +607,7 @@ then echo "ok   pane trustblock: next says to rerun, not to wait"; else echo "FA
 verdict updatemenu  3 BLOCKED  no    # Codex's update menu stays answerable too
 if [[ $last == *"next: Codex's update menu"*'send-keys'*' 3 '*'rerun the launch'* ]]
 then echo "ok   pane updatemenu: next names the skip key and the rerun"; else echo "FAIL pane updatemenu: next was '${last##*$'\n'}'"; fail=1; fi
+verdict updatemenu  7 NOSTART  yes claude sonnet medium impl t-menu "$b"   # the menu is Codex's alone
 verdict startfail   7 NOSTART  yes   # any other start failure still closes the pane
 verdict gone        6 GONE     no
 verdict wait        0 REPORT   no  --wait p1 "$tmp/handoff/w.json"   # --wait allows an initial blocked grace period and keeps the pane
