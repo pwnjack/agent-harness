@@ -13,8 +13,8 @@ skill, or at `build` when its scope fits in three lines.
 
 ## 1. Brainstorm
 
-- Read first: the code, docs and memory the idea touches. Never ask what you
-  can look up.
+- Read first: the code, docs and memory the idea touches, and whatever
+  already does this job. Never ask what you can look up.
 - Say the idea back in two lines: who it is for and what must be true when it
   is done.
 - Ask only what changes the design, one question at a time, each with the
