@@ -26,7 +26,9 @@ skill, or at `build` when its scope fits in three lines.
 ## 2. Grill
 
 Run the `grill` skill on the approach the user picked. Its decision list
-becomes the spec's Decisions section.
+becomes the spec's Decisions section. An early yes ("build it") skips the
+questions to the user, not the attack list: answer it from the code and put
+what stays open in the spec.
 
 ## 3. Spec
 

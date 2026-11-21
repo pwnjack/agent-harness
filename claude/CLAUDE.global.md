@@ -97,10 +97,10 @@ Always:
 ## Verification
 
 Evidence before assertions. A worker's test claims are not evidence; re-run
-the verification commands yourself before calling anything done, and chain a
-commit to them with `&&` so a failing check stops it. Gate on each check's own
-exit status: a pipe reports its last command's, so filter a check's output
-only under `set -o pipefail`.
+the checks yourself before calling it done, and chain a commit to them with
+`&&` so a failing one stops it. Gate on each check's own exit status: a pipe
+reports its last command's, so filter output only under `set -o pipefail`.
+Hand the user no step you have not run their way.
 
 ## Learning
 
