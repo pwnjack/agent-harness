@@ -38,8 +38,9 @@ nothing is pushed or merged unasked.
 4. **Risky task** (the plan says so): run the `review` skill on that commit
    before building on it.
 
-When the plan turns out wrong (a missing place, a task that cannot pass),
-stop, fix the plan with the user, then go on. Never improvise past it.
+When the plan turns out wrong (a missing place, a task that cannot pass), or
+you are about to build a detail differently from what it specifies, stop, fix
+the plan with the user, then go on. Never improvise past it.
 
 ## 3. The whole change
 
