@@ -79,8 +79,8 @@ check "loop: wrap-up closes a session, not a change" \
 check "design: its description claims only an open, costly approach" \
   bash -c 'sed -n 3p "$1" | grep -qF "more than one sound approach, would cost real rework if guessed wrong, and has no spec yet" \
     && ! sed -n 3p "$1" | grep -qF "build X"' _ "$here/design/SKILL.md"
-check "verification: a step handed to the user was run their way" \
-  says "$g" 'Hand the user no step you have not run their way.'
+check "verification: a step is run as the user will, or marked untested" \
+  says "$g" 'Run steps as the user will or mark them untested.'
 check "design: sends a decided change on" \
   says "$here/design/SKILL.md" 'A change that is already decided needs no spec'
 check "design: an early yes skips the questions, not the attack list" \

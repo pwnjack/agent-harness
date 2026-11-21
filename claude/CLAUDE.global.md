@@ -100,7 +100,7 @@ Evidence before assertions. A worker's test claims are not evidence; re-run
 the checks yourself before calling it done, and chain a commit to them with
 `&&` so a failing one stops it. Gate on each check's own exit status: a pipe
 reports its last command's, so filter output only under `set -o pipefail`.
-Hand the user no step you have not run their way.
+Run steps as the user will or mark them untested.
 
 ## Learning
 
