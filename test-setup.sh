@@ -196,7 +196,7 @@ if [ "$(readlink "$HOME/.claude/harness")" = "$repo" ] && commands_correct \
   ok 'custom config: stable harness link and configured instruction link'
 else no 'custom config: stable harness link and configured instruction link'; fi
 saved=false
-for backup in "$XDG_STATE_HOME"/dotfiles-agents-backup/*/.claude/harness*; do
+for backup in "$XDG_STATE_HOME"/agent-harness-backup/*/.claude/harness*; do
   if [ -f "$backup" ] && [ "$(cat -- "$backup")" = 'keep this file' ]; then saved=true; fi
 done
 if "$saved"; then ok 'custom config: existing harness file backed up'

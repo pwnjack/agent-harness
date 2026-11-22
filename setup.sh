@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Wire the tracked AI-agent harness (claude/, codex/) into a machine.
+# Wire the tracked agent harness (claude/, codex/, herdr/, brain/) into a
+# machine.
 #
 # Only what this repo authored is linked or merged in; everything the agents or
 # other tools write — logins, history, memory, caches, their own hooks — is
@@ -12,10 +13,9 @@
 # Links: this repo -> ~/.claude/harness, claude/skills/*/ -> ~/.claude/skills/,
 # claude/CLAUDE.global.md -> ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md, one
 # file for both agents (CLAUDE_CONFIG_DIR and CODEX_HOME are honoured, as the
-# apply scripts do). Anything already at a link target is
-# moved — never deleted — into ~/.local/state/dotfiles-agents-backup/<time>/.
-# Links into this repo whose target is gone (a removed skill or hook) are
-# deleted.
+# apply scripts do). Anything already at a link target is moved — never
+# deleted — into ~/.local/state/agent-harness-backup/<time>/. Links into this
+# repo whose target is gone (a removed skill or hook) are deleted.
 set -euo pipefail
 
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,15 +30,15 @@ for option in "$@"; do
 done
 claude_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 codex_dir=${CODEX_HOME:-$HOME/.codex}
-backup_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-agents-backup/$(date +%Y%m%d-%H%M%S)"
+backup_root="${XDG_STATE_HOME:-$HOME/.local/state}/agent-harness-backup/$(date +%Y%m%d-%H%M%S)"
 
 run() { if $dry; then echo "  would run: $*"; else "$@"; fi; }
 have() { command -v "$1" >/dev/null 2>&1; }
-refuse() { echo "agents: $*" >&2; exit 1; }
+refuse() { echo "setup: $*" >&2; exit 1; }
 
 # Resolve existing ancestors without creating anything during preflight.
 absolute_path() {
-  local path=$1 suffix= part
+  local path=$1 suffix='' part
   case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
   while [ ! -d "$path" ]; do
     part=$(basename -- "$path")
