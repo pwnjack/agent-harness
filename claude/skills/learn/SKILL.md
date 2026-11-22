@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Turn a correction, a defect or harness friction into one lasting prevention, and improve the harness when that is where it belongs. Use after the user corrects you, after a review or verification finds a defect you caused, when a skill misled you or you worked around the harness twice, for "remember this", "learn from this", "improve the harness", /learn, and as the last step of wrap-up.
+description: Turn a correction, a defect or harness friction into one lasting prevention, and improve the harness when that is where it belongs. Use after the user corrects you, after a review or verification finds a defect you caused, when a skill misled you or you worked around the harness twice, for "remember this", "learn from this", "improve the harness", /learn, and when the wrap-up skill reaches its learn step.
 ---
 
 # Learn

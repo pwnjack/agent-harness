@@ -1,6 +1,6 @@
 ---
 name: review
-description: One blind review of a change by the other model family against its spec or plan, then fix what holds. Use for "review this", "review the branch", "get codex to review", "lean review", /review, as the last step of the build skill, and before reporting any non-trivial change done.
+description: One blind review of a change by the other model family against its spec or plan, then fix what holds. Use for "review this", "review the branch", "get codex to review", "lean review", /review, when the build skill reaches its review step, and before reporting any non-trivial change done.
 ---
 
 # Review

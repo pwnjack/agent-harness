@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: Use when the user ends a session in any words (finalize, wrap up, conclude, close the session, done for today, goodbye, clean everything up before we go).
+description: Close a session - verify the final state, remove what the session created, hand over and learn. Use when the user ends a session in any words (finalize, wrap up, conclude, close the session, done for today, goodbye, clean everything up before we go) and for /wrap-up.
 ---
 
 # Wrap-up
@@ -57,9 +57,9 @@ session cannot know that, and skips none.
    - An item that stays gets a reason in the report: a gitignored mockup a
      spec refers to, a worktree the user asked to keep, a stack with data.
 4. **Confirm.** The tree is clean, the current branch and the main branch
-   match their origin copies, no worker pane or server of this session is
-   left. Show the commands and their output; a claim without output is not
-   confirmation.
+   match their origin copies or what is unpushed is under pending, and no
+   worker pane or server of this session is left. Show the commands and
+   their output; a claim without output is not confirmation.
 5. **Record.** Run the `handover` skill; it writes nothing when nothing
    passes on.
 6. **Learn.** Run the `learn` skill for every correction, defect or harness

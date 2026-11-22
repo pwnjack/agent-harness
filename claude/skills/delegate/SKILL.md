@@ -26,8 +26,9 @@ not a rule; a model or effort the user names wins.
   `high` the next model at `medium`. With no model above, `sol` goes to
   `xhigh` and Opus stops. If that falls short too, stop and tell the user.
 - Only the names in the table run freely. Any other (`fable`, `astra`,
-  anything new) runs only when the user asks for it by name, and `pane.sh`
-  refuses it without `DELEGATE_EXPENSIVE=1`. Never effort `max` or `ultra`.
+  anything new) runs only when the user asks for it by name or says yes to
+  your proposal, and `pane.sh` refuses it without `DELEGATE_EXPENSIVE=1`.
+  Never effort `max` or `ultra`.
 
 ## The brief
 
