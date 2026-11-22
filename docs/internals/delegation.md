@@ -11,14 +11,13 @@ The rules an orchestrator follows are in the skills (`delegate`, `review`,
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call,
   and ends with a `next:` line that tells the orchestrator what to do with the
-  verdict, so that handling is not restated in the skill.
-  The first worker splits the orchestrator's pane to the right and the second
-  splits that worker, a column of two. Further workers go to `crew`, `crew-2`,
-  `crew-3`… tabs of four (2×2) in the same workspace. A new worker splits the
-  largest pane, along its longer side, so every pane is a half or a quarter;
-  Herdr gives a closed worker's space to its sibling and closes a tab when its
-  last pane closes. Each worker opens in the caller's directory, so a worktree
-  is the worker's project root and sandbox. The Herdr-only
+  verdict, so that handling is not restated in the skill. Workers fill a
+  column of two beside the orchestrator, then `crew` tabs of four (2×2) in
+  the same workspace (the exact rule is under Placement below). A new worker
+  splits the largest pane, along its longer side, so every pane is a half or
+  a quarter; Herdr gives a closed worker's space to its sibling and closes a
+  tab when its last pane closes. Each worker opens in the caller's directory,
+  so a worktree is the worker's project root and sandbox. The Herdr-only
   `claude/hooks/agent-guard.sh` refuses the Agent tool; outside Herdr it is
   silent and the Agent tool is the Claude fallback, with the same model,
   effort and brief.
@@ -70,8 +69,8 @@ alone.
 - `pane.sh` sets `HARNESS_ROLE=<role>` on each worker pane, so the Herdr
   sidebar shows the worker's role.
 - On a Codex "hooks need review" screen, `pane.sh` sends Escape and resends
-  the prompt once. Never answer that screen with
-  "trust all"; that is the user's call.
+  the prompt once. Never answer that screen with "trust all"; that is the
+  user's call.
 - Quota is judged only when the worker is idle, against Codex's own error
   wording in the last lines of text on the screen (blank lines do not count).
 - `--wait` and `--resume` keep the pane on REPORT; `DELEGATE_KEEP=0` makes
@@ -80,7 +79,7 @@ alone.
 - A start that fails on a first-run folder-trust prompt or on Codex's update
   menu is BLOCKED with the pane kept and its own `next:` line: the brief was
   never sent, so the launch is rerun after the prompt is answered.
-- A block in the first seconds of a resumed `--wait` is not reported.
+- A block in the first seconds of a `--wait` is not reported.
 - A Claude worker idle while its own background work runs is not finished:
   while the last four lines of text show Claude Code's footer count
   (`· 1 shell, 1 monitor`, or a count opening the line, followed by `,`, `·`
@@ -112,8 +111,7 @@ alone.
   `flock` on `.place.lock` in the handoff dir (fd 9) from just before it
   counts the column until `herdr agent start` returns, and nothing placement
   starts (its subshell, `jq`, `herdr`) inherits the fd, so killing the launch
-  frees the lock at once. After
-  `DELEGATE_LOCK_WAIT` seconds (default 90) the launch goes ahead without it
-  and prints a note; with no `flock` on PATH it goes ahead silently.
-  `--wait` and `--resume` never lock. `flock` is util-linux, so this is
-  Linux only, like the rest of `pane.sh`.
+  frees the lock at once. After `DELEGATE_LOCK_WAIT` seconds (default 90) the
+  launch goes ahead without it and prints a note; with no `flock` on PATH it
+  goes ahead silently. `--wait` and `--resume` never lock. `flock` is
+  util-linux, so this is Linux only, like the rest of `pane.sh`.

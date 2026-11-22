@@ -1,5 +1,5 @@
-# Codex status bar — the tracked slice of ~/.codex/config.toml.
-# apply-config.sh merges these keys into the live file.
+# Codex status bar and terminal title — a tracked slice of
+# ~/.codex/config.toml. apply-config.sh merges these keys into the live file.
 [tui]
 status_line = ["model-with-reasoning", "context-used", "used-tokens", "context-window-size", "five-hour-limit", "weekly-limit"]
 status_line_use_colors = true

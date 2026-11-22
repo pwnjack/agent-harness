@@ -16,7 +16,7 @@ pipefail='(^|[;&[:space:]])set[[:space:]]([^;&|]*[[:space:]])?-[[:alpha:]]*o[[:s
 text=${text//'||'/}
 text=${text//'>|'/}
 # Everything before the last commit, so a second commit in the chain counts.
-before= rest=$text
+before='' rest=$text
 while [[ $rest =~ $commit ]]; do
   before+=${rest%%"${BASH_REMATCH[0]}"*}
   rest=${rest#*"${BASH_REMATCH[0]}"}

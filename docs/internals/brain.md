@@ -27,8 +27,8 @@ and the commit script refuses any tracked ignored file.
 The rendered service runs `brain/commit.sh <projects-dir>`. The timer fires
 two minutes after login (`OnStartupSec=2min`) and every thirty minutes
 (`OnUnitActiveSec=30min`); enabling it fires it at once. Units live in
-`~/.config/systemd/user/`; they are generated machine files and must never be
-tracked in the dotfiles. Inspect runs with:
+`~/.config/systemd/user/`; they are generated machine files and are never
+tracked. Inspect runs with:
 
 ```bash
 systemctl --user status brain-commit.timer
@@ -70,19 +70,19 @@ journalctl --user -u brain-commit
 silent when the brain git directory or that memory is absent. It reports
 memories absent from `MEMORY.md`, index links to missing files and secret
 patterns by name, including symlinked Markdown files and nested `MEMORY.md`
-files. Only relative file
-links count as memory entries; repeated links are checked once. Symlinks to
-regular files are scanned even outside memory: the audit checks what the
-agent reads, while `commit.sh` stores only the link text. Dangling links and
-links to non-regular targets get one diagnostic per path; symlinked directories
-are never traversed. An explicit key without a memory directory is an error.
-Unreadable files and scan errors are reported without stopping the remaining
-audit. Patterns need no final newline. Findings exit 1; a clean audit exits 0.
-It warns when a `MEMORY.md`
-exceeds 4096 bytes (Claude loads only the start of the index), and when any
-other memory file exceeds 8192 bytes (one fact per file; split it), and when a
-memory cites a backticked `~/` path that no longer exists. The commit script
-journals the audit after each commit; audit findings never undo a commit.
+files. Only relative file links count as memory entries; repeated links are
+checked once. Symlinks to regular files are scanned even outside memory: the
+audit checks what the agent reads, while `commit.sh` stores only the link
+text. Dangling links and links to non-regular targets get one diagnostic per
+path; symlinked directories are never traversed. An explicit key without a
+memory directory is an error. Unreadable files and scan errors are reported
+without stopping the remaining audit. Patterns need no final newline.
+Findings exit 1; a clean audit exits 0. It warns, without failing, when a
+`MEMORY.md` exceeds 4096 bytes (Claude loads only the start of the index),
+when any other memory file exceeds 8192 bytes (one fact per file; split it),
+and when a memory cites a backticked `~/` path that no longer exists. The
+commit script journals the audit after each commit; audit findings never undo
+a commit.
 
 Off switches, independent and history-preserving:
 `systemctl --user disable --now brain-commit.timer` stops automatic commits;

@@ -36,9 +36,9 @@
 #
 # Effort. Clamped down to the highest level the model lists at or below the
 # request, but never to low unless low was asked for; failing that, up to its
-# lowest listed delegate level. A model that
-# lists no levels gets the request unchanged. "ultra" enables automatic task
-# delegation and is refused outright; "max" is outside the delegate vocabulary.
+# lowest listed delegate level. A model that lists no levels gets the request
+# unchanged. "ultra" enables automatic task delegation and is refused
+# outright; "max" is outside the delegate vocabulary.
 set -euo pipefail
 
 STANDARD="luna terra sol"

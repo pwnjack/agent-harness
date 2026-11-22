@@ -52,7 +52,7 @@ set -uo pipefail
 
 here=$(dirname "$(readlink -f "$0")")
 poll=${DELEGATE_POLL:-3} quiet=${DELEGATE_QUIET:-20} land=${DELEGATE_LAND:-45}
-start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' next='' body= pre= preseq= seq=
+start=$(date +%s) kind='' pane='' report='' model='' effort='' msg='' waiting='' landed=0 note='' next='' body='' pre='' preseq='' seq=''
 
 CLAUDE_STANDARD="haiku sonnet opus"
 ROLES='impl|review|explore|fix'

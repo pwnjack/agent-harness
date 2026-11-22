@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code status line — model, effort, context, prompt cache, 5h/7d rate
-# limits with the weekly pace.
+# limits with the weekly pace. Registered as statusLine in claude/settings.json.
 # Adapted from https://github.com/fedddorov/claude-code-status-bar (MIT).
-# Wire up in ~/.claude/settings.json:
-#   "statusLine": {"type": "command", "command": "bash ~/.claude/harness/claude/statusline.sh"}
 # The session's time locale, kept for naming reset days before LC_ALL=C below.
 time_locale=${LC_ALL:-${LC_TIME:-${LANG:-C}}}
 export LC_ALL=C   # Use the C locale for numeric formatting.
@@ -47,15 +45,15 @@ ORG=$'\033[38;5;173m'   # soft amber
 RED=$'\033[38;5;167m'   # soft rose-red
 BLU=$'\033[38;5;110m'   # soft steel blue: context's base, apart from the usage bars
 MAG=$'\033[38;5;140m'   # muted purple
-# rate-limit color: green < 50, yellow >= 50, orange >= 80, red >= 90
+# rate-limit colour: green < 50, yellow >= 50, orange >= 80, red >= 90
 hue() { awk -v p="$1" -v g="$GRN" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(p>=90)print r;else if(p>=80)print o;else if(p>=50)print y;else print g}'; }
-# context color: blue < 50, yellow >= 50, orange >= 70, red >= 85
+# context colour: blue < 50, yellow >= 50, orange >= 70, red >= 85
 hue_ctx() { awk -v p="$1" -v g="$BLU" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN{if(p>=85)print r;else if(p>=70)print o;else if(p>=50)print y;else print g}'; }
-# reasoning-effort color: green = low, yellow = medium, orange = high, red = xhigh, purple = max
+# reasoning-effort colour: green = low, yellow = medium, orange = high, red = xhigh, purple = max
 hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high) echo "$ORG";; xhigh) echo "$RED";; max) echo "$MAG";; *) echo "$DIM";; esac; }
-# prompt-cache color by seconds left before the prefix goes cold: green > 15 min, yellow > 5 min, orange after
+# prompt-cache colour by seconds left before the prefix goes cold: green > 15 min, yellow > 5 min, orange after
 hue_cache() { awk -v t="$1" -v now="$(date +%s)" -v g="$GRN" -v y="$YEL" -v o="$ORG" 'BEGIN{s=t-now;if(s>900)print g;else if(s>300)print y;else print o}'; }
-# weekly-pace color: dim within 5 points of the elapsed week, yellow > 5 ahead, orange > 15 ahead
+# weekly-pace colour: dim within 5 points of the elapsed week, yellow > 5 ahead, orange > 15 ahead
 hue_pace() { awk -v d="$1" -v n="$DIM" -v y="$YEL" -v o="$ORG" 'BEGIN{if(d>15)print o;else if(d>5)print y;else print n}'; }
 
 # FiraCode's own progress bar (U+EE00-EE05): an outlined, round-ended bar
@@ -65,7 +63,7 @@ PB=($'\xee\xb8\x80' $'\xee\xb8\x81' $'\xee\xb8\x82'
     $'\xee\xb8\x83' $'\xee\xb8\x84' $'\xee\xb8\x85')
 BAR_CELLS=8
 
-# bar <percent> <color>: the whole bar in one colour with a continuous outline.
+# bar <percent> <colour>: the whole bar in one colour with a continuous outline.
 # The cell count rounds percent/100*(n-0.6)+0.4 to the nearest integer,
 # clamped to 0..n, with zero percent producing no filled cells.
 bar() {
@@ -79,7 +77,7 @@ bar() {
   printf '%s%s%s' "$2" "$out" "$R"
 }
 
-# pie <percent> <color>: one cell for the context meter, a circle that fills
+# pie <percent> <colour>: one cell for the context meter, a circle that fills
 # clockwise in eighths: nf-md-circle_outline, then nf-md-circle_slice_1..8
 # (U+F0766, U+F0A9E-F0AA5), encoded as UTF-8 bytes.
 PIE=($'\xf3\xb0\x9d\xa6' $'\xf3\xb0\xaa\x9e' $'\xf3\xb0\xaa\x9f'
@@ -96,7 +94,7 @@ FIRE=$'\xf3\xb0\x88\xb8'
 SNOW=$'\xf3\xb0\x9c\x97'
 
 # clock time of an epoch, with the weekday when it is not today; 12 h when
-# options/clock says so, like the bar and the desktop clock
+# ~/.config/options/clock holds 12h
 fmt_at() {
   local f='%H:%M'
   [ "$(cat "$HOME/.config/options/clock" 2>/dev/null)" = 12h ] && f='%-I:%M%p'
