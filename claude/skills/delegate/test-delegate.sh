@@ -6,6 +6,9 @@
 set -uo pipefail
 here=$(dirname "$(readlink -f "$0")")
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+export HOME="$tmp/home" CLAUDE_CONFIG_DIR="$tmp/claude" CODEX_HOME="$tmp/codex"
+export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
+mkdir -p -- "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
 fail=0
 
 # model <slug> <visibility> <priority> <efforts...>
@@ -641,4 +644,4 @@ KEEP=1 verdict keep      0 REPORT  no     # kept open for a fix round
 KEEP=1 verdict keepwait  0 REPORT  no --wait p1 "$tmp/handoff/kw.json"   # and again after the round
 KEEP=1 QUIET=0 verdict keepquota 5 QUOTA yes    # a pane out of quota is closed regardless
 
-exit $fail
+exit "$fail"

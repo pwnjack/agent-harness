@@ -12,8 +12,8 @@ export XDG_STATE_HOME="$tmp/state" XDG_CONFIG_HOME="$tmp/config"
 mkdir -p -- "$HOME/.claude" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$XDG_STATE_HOME" "$XDG_CONFIG_HOME"
 ln -s -- "$repo" "$HOME/.claude/harness"
 fail=0
-ok() { echo "ok   $1"; }
-no() { echo "FAIL $1"; fail=1; }
+ok() { printf 'ok   %s\n' "$1"; }
+no() { printf 'FAIL %s\n' "$1"; fail=1; }
 reason="Inside Herdr every subagent runs in a pane: use the delegate skill (pane.sh). A skill's 'dispatch a subagent' names the role, not the tool."
 
 out=$(env HERDR_ENV=1 sh "$here/agent-guard.sh" <<<'{"tool_name":"Agent"}' 2>&1); rc=$?

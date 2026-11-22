@@ -19,8 +19,8 @@ printf '#!/usr/bin/env bash\nprintf "claude: current\\ncodex: current\\n"\n' > "
 chmod +x -- "$tmp"/bin/*
 export PATH="$tmp/bin:$PATH"
 fail=0
-ok() { echo "ok   $1"; }
-no() { echo "FAIL $1"; fail=1; }
+ok() { printf 'ok   %s\n' "$1"; }
+no() { printf 'FAIL %s\n' "$1"; fail=1; }
 
 run() { jq -n --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}' | bash "$here/git-patch-guard.sh" 2>&1; }
 
