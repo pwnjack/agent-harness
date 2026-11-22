@@ -139,6 +139,10 @@ check "delegate: launches name pane.sh under the harness link" \
   bash -c 'grep -q "~/\.claude/harness/claude/skills/delegate/pane\.sh" "$1" && ! grep -q "~/\.claude/skills/" "$1"' \
   _ "$here/delegate/SKILL.md"
 check "review: the rubric is report-only" grep -q 'edit no file' "$here/review/rubric.md"
+check "review: the rubric keeps the reviewer to the commands its brief names" \
+  grep -q 'Run only the commands the brief names' "$here/review/rubric.md"
+check "review: the brief names the checks the reviewer may run" \
+  says "$here/review/SKILL.md" 'the checks the reviewer may run'
 
 # --- no pinned model identifiers in instruction text ---------
 check "no pinned model ids in skill, instruction or manual text" \

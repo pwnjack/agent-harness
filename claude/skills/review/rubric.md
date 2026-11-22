@@ -1,6 +1,8 @@
 # Review rubric
 
 A reviewer reads this from its brief. Report findings only; edit no file.
+Run only the commands the brief names: whatever else a check would need (a
+server, a browser, a build, the network) goes under `Not checked`.
 
 ## Scope
 

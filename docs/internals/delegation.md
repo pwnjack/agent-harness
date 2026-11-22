@@ -7,7 +7,9 @@ The rules an orchestrator follows are in the skills (`delegate`, `review`,
 
 - **Review is cross-family and blind.** The reviewer reads
   `claude/skills/review/rubric.md` from its brief, so the rubric costs context
-  only in the reviewer's pane, and never sees the implementer's report.
+  only in the reviewer's pane, and never sees the implementer's report. It
+  runs only the commands the brief names, so a review never waits at a
+  sandbox prompt for a server, a browser or a build of its own.
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call,
   and ends with a `next:` line that tells the orchestrator what to do with the

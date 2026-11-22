@@ -31,7 +31,8 @@ work, `sonnet` for yours or Opus's); say the review was same-family.
 
 The goal, the acceptance criteria (the spec or plan path; with no file, the
 three scope lines from the `build` skill, written out), what to review as
-above, and this line. Never the implementer's report or test claims.
+above, the checks the reviewer may run, and this line. Never the
+implementer's report or test claims.
 
 > Read `~/.claude/harness/claude/skills/review/rubric.md` and follow it.
 > Report findings only; do not edit any file.
