@@ -6,12 +6,12 @@
 # which no longer matches its own text.
 #
 # A textual guard, not a shell parser. In order: heredoc bodies are dropped
-# and backslash-newlines joined (command-text.sh), quoted strings replaced by
-# Q (or QB when they hold a bracketed character), the rest cut into simple
-# commands at newlines, ; | & ( ) and backticks, comments and redirections cut
-# off. A pkill or pgrep word (bare or after a path) with an f option and no
-# bracketed pattern is refused. `echo pkill -f x` unquoted is a known false
-# refusal.
+# and backslash-newlines turned into spaces (command-text.sh), quoted strings
+# replaced by Q (or QB when they hold a bracketed character), the rest cut
+# into simple commands at newlines, ; | & ( ) and backticks, comments and
+# redirections cut off. A pkill or pgrep word (bare or after a path) with an
+# f option and no bracketed pattern is refused. `echo pkill -f x` unquoted is
+# a known false refusal.
 set -euo pipefail
 
 # shellcheck source=claude/hooks/command-text.sh

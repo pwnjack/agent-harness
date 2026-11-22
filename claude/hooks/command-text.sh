@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Sourced by the Bash guards (pkill-guard.sh, commit-pipe-guard.sh,
 # git-patch-guard.sh). Reads the PreToolUse JSON on stdin and sets `text` to
-# the command with heredoc bodies dropped and backslash-newlines joined.
-# Without a command string it exits 0, so the hook that sources it stays
-# silent.
+# the command with heredoc bodies dropped and each backslash-newline turned
+# into a space. Without a command string it exits 0, so the hook that sources
+# it stays silent.
 
 command=$(jq -r '.tool_input.command | strings' 2>/dev/null) || exit 0
 [ -n "$command" ] || exit 0

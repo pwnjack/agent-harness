@@ -53,7 +53,7 @@ hue_ctx() { awk -v p="$1" -v g="$BLU" -v y="$YEL" -v o="$ORG" -v r="$RED" 'BEGIN
 hue_eff() { case "$1" in low) echo "$GRN";; medium) echo "$YEL";; high) echo "$ORG";; xhigh) echo "$RED";; max) echo "$MAG";; *) echo "$DIM";; esac; }
 # prompt-cache colour by seconds left before the prefix goes cold: green > 15 min, yellow > 5 min, orange after
 hue_cache() { awk -v t="$1" -v now="$(date +%s)" -v g="$GRN" -v y="$YEL" -v o="$ORG" 'BEGIN{s=t-now;if(s>900)print g;else if(s>300)print y;else print o}'; }
-# weekly-pace colour: dim within 5 points of the elapsed week, yellow > 5 ahead, orange > 15 ahead
+# weekly-pace colour: dim up to 5 points ahead of the elapsed week (or behind it), yellow > 5 ahead, orange > 15 ahead
 hue_pace() { awk -v d="$1" -v n="$DIM" -v y="$YEL" -v o="$ORG" 'BEGIN{if(d>15)print o;else if(d>5)print y;else print n}'; }
 
 # FiraCode's own progress bar (U+EE00-EE05): an outlined, round-ended bar

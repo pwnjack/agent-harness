@@ -75,14 +75,15 @@ checked once. Symlinks to regular files are scanned even outside memory: the
 audit checks what the agent reads, while `commit.sh` stores only the link
 text. Dangling links and links to non-regular targets get one diagnostic per
 path; symlinked directories are never traversed. An explicit key without a
-memory directory is an error. Unreadable files and scan errors are reported
-without stopping the remaining audit. Patterns need no final newline.
-Findings exit 1; a clean audit exits 0. It warns, without failing, when a
-`MEMORY.md` exceeds 4096 bytes (Claude loads only the start of the index),
-when any other memory file exceeds 8192 bytes (one fact per file; split it),
-and when a memory cites a backticked `~/` path that no longer exists. The
-commit script journals the audit after each commit; audit findings never undo
-a commit.
+memory directory is an error; a `-tmp*` key is always skipped. Unreadable
+files and scan errors are reported without stopping the remaining audit.
+Patterns need no final newline. Errors exit 1; a clean or warning-only audit
+exits 0. It warns when a `MEMORY.md` exceeds 4096 bytes (Claude loads only
+the start of the index), when any other memory file exceeds 8192 bytes (one
+fact per file; split it), and when a memory cites a whole backticked `~/`
+path (no spaces, placeholders or globs) that no longer exists. The commit
+script journals the audit after each commit; audit findings never undo a
+commit.
 
 Off switches, independent and history-preserving:
 `systemctl --user disable --now brain-commit.timer` stops automatic commits;

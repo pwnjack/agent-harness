@@ -26,9 +26,9 @@
 `./setup.sh [--dry-run] [--brain]` does the wiring. It skips any absent tool,
 moves an existing file aside into
 `~/.local/state/agent-harness-backup/<time>/` instead of deleting it, deletes
-links into this repo whose target is gone, lets Herdr install its own
-agent-state hooks, and sets the clone's `core.hooksPath` to `githooks` when
-the copy has a `.git` entry.
+skill and hook links into this repo's `claude/` whose target is gone, lets
+Herdr install its own agent-state hooks, and sets the clone's
+`core.hooksPath` to `githooks` when the copy has a `.git` entry.
 
 - Live settings are regular files. Edit the tracked file, then run the apply
   script.
@@ -43,8 +43,8 @@ the copy has a `.git` entry.
   `ask` and `deny` arrays are ordered unions: live entries first, then tracked
   entries, without duplicates. Hooks have the merging rule below; other arrays
   use the tracked value. The script replaces a live hook that runs the same
-  script file. It drops a live hook whose `~/.claude/hooks` script is gone but
-  otherwise never removes a key, so a setting or permission rule dropped from
+  script file. It drops a live hook that names a `~/.claude/hooks` script
+  absent from `<config>/hooks` but otherwise never removes a key, so a setting or permission rule dropped from
   the tracked file must be removed from the live file by hand. It always
   deletes `advisorModel`.
 
@@ -54,8 +54,8 @@ initial whitelist commit. It refuses an existing git directory without that
 gitfile before changing anything; inspect and recover that directory manually.
 Symlinked `.git` entries and foreign repositories are also refused.
 
-The tracked `claude/settings.json` carries the `permissions.deny` list that
-keeps agents out of secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
+The tracked `claude/settings.json` carries the `permissions.deny` list of
+`Read` rules for secrets (`.env` files, `~/.ssh`, `~/.gnupg`, calendar and
 vdirsyncer data), the Agent-tool guard hook, the three Bash guard hooks
 (`pkill -f`, commit after a pipe, interactive patch), the advisor-reset hook,
 the status line, empty commit and pull request attribution, the fullscreen
@@ -94,11 +94,11 @@ once a response has reported cache tokens: a flame with the time left before
 the cached prefix goes cold, or a snowflake with the tokens the next request
 re-caches. The 7-day limit carries a pace delta, the used percentage minus
 the elapsed share of the window, so `+6` means usage runs six points ahead of
-the clock; it is dim within five points, yellow above, orange above fifteen.
-The tracked settings re-run the line every 60 seconds so the countdown moves
-while the session idles. Codex shows the same fields from
-`codex/statusline.toml`, with `terminal_title` set to the spinner and the
-thread title.
+the clock; it is dim up to five points ahead, yellow above, orange above
+fifteen. The tracked settings re-run the line every 60 seconds so the
+countdown moves while the session idles. Codex shows the model and effort,
+the context and the two limits from `codex/statusline.toml`, with
+`terminal_title` set to the spinner and the thread title.
 
 `herdr/sidebar.toml` gives Herdr's agent sidebar a 34-column layout of two
 rows per agent, with no gap between agents, no meter and no session title:
@@ -230,9 +230,9 @@ rules and `autoDreamEnabled`. Other hooks, including Herdr's, and unrelated
 settings survive; empty permissions and hooks objects are removed. The Codex
 sidebar hook is removed from every event in `hooks.json`; other Codex hooks
 survive, and a `hooks.json` that is not a JSON object with a `hooks` object
-is left alone. The block is safe to run again after removal. Only skill and
-instruction symlinks pointing at this clone are removed. The brain worktree,
-its `.git` file and its git directory remain, with automatic commits
-disabled. Merged preferences and Codex's TOML settings stay; review them
+is left alone. The block is safe to run again after removal. Only the
+harness link and the skill and instruction symlinks pointing at this clone
+are removed. The brain worktree, its `.git` file and its git directory
+remain, with automatic commits disabled. Merged preferences and Codex's TOML settings stay; review them
 against `claude/settings.json` and `codex/*.toml` to revert those too. The
 clone's `core.hooksPath` stays local to that clone.

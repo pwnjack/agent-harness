@@ -11,12 +11,12 @@ The rules an orchestrator follows are in the skills (`delegate`, `review`,
 - **Every worker runs in a Herdr pane**, Claude and Codex alike, so the user
   can watch it. `pane.sh` spawns, prompts and waits in one background call,
   and ends with a `next:` line that tells the orchestrator what to do with the
-  verdict, so that handling is not restated in the skill. Workers fill a
-  column of two beside the orchestrator, then `crew` tabs of four (2×2) in
-  the same workspace (the exact rule is under Placement below). A new worker
-  splits the largest pane, along its longer side, so every pane is a half or
-  a quarter; Herdr gives a closed worker's space to its sibling and closes a
-  tab when its last pane closes. Each worker opens in the caller's directory,
+  verdict, so that handling is not restated in the skill. Up to two workers
+  go beside the orchestrator, then up to four per `crew` tab in the same
+  workspace (the exact rule is under Placement below). A new worker splits
+  the largest pane, along the side that looks longer on screen; Herdr gives
+  a closed worker's space to its sibling and closes a tab when its last pane
+  closes. Each worker opens in the caller's directory,
   so a worktree is the worker's project root and sandbox. The Herdr-only
   `claude/hooks/agent-guard.sh` refuses the Agent tool; outside Herdr it is
   silent and the Agent tool is the Claude fallback, with the same model,

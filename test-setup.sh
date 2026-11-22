@@ -317,7 +317,7 @@ if bash -- "$repo/setup.sh" --brain > "$tmp/output" 2>&1; then
 elif [ "$(readlink "$CLAUDE_CONFIG_DIR/projects/.git")" = "$tmp/symlink-gitfile" ] \
    && [ "$(cat -- "$tmp/symlink-gitfile")" = "gitdir: $XDG_STATE_HOME/agent-brain.git" ] \
    && [ ! -e "$HOME/.claude" ] && [ ! -s "$TEST_SYSTEMCTL_LOG" ] \
-   && grep -qF -- 'refusing existing repository' "$tmp/output"; then
+   && grep -q -- '^setup: refusing existing repository' "$tmp/output"; then
   ok 'brain: symlinked .git refused unchanged'
 else no 'brain: symlinked .git refused unchanged'; fi
 

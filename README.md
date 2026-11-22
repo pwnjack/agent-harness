@@ -35,9 +35,10 @@ tool writes for itself stay out.
 
 ## Trying it
 
-It needs Bash, Git and `jq`; Python 3 for the delegate scripts and the
-pre-commit hook. Claude Code, Codex and Herdr (the terminal workspace whose
-panes the workers run in) are each optional: setup skips whatever is missing.
+It needs Bash, Git and `jq`; Python 3.11 or later for the delegate scripts
+and the pre-commit hook. Claude Code, Codex and Herdr (the terminal workspace
+whose panes the workers run in) are each optional: setup skips whatever is
+missing.
 
 ```sh
 ./setup.sh --dry-run   # show what would be linked and merged
